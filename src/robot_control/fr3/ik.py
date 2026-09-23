@@ -25,7 +25,7 @@ class PinocchioIK:
         try:
             import pinocchio as pin
         except ImportError as exc:
-            raise BackendUnavailableError("Install piper-control[mujoco] for Pinocchio IK") from exc
+            raise BackendUnavailableError("Install robot-control[mujoco] for Pinocchio IK") from exc
         self.pin = pin
         self.model = pin.buildModelFromUrdf(str(urdf_path))
         self.data = self.model.createData()

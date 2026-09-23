@@ -9,13 +9,13 @@ from ..errors import BackendUnavailableError
 from ..scene import SceneClient, twin_socket_path
 
 
-class PiperRobot:
+class Robot:
     def __init__(self, backend: RobotBackend):
         self._backend = backend
 
     @classmethod
     def connect(cls, backend: str = "mujoco", config: dict[str, Any] | None = None,
-                robot: str = "piper") -> "PiperRobot":
+                robot: str = "piper") -> "Robot":
         config = dict(config or {})
         robot = "piper" if robot == "pepper" else robot
         if "robot" in config:
@@ -130,3 +130,6 @@ class PiperRobot:
         if method is None:
             raise NotImplementedError("Waiting for motion is not implemented by this backend")
         method(timeout)
+
+
+PiperRobot = Robot

@@ -3,9 +3,9 @@ import pytest
 
 mujoco = pytest.importorskip("mujoco")
 
-from piper_control.backends.mujoco import MujocoBackend
-from piper_control import Pose
-from piper_control.errors import IKError
+from robot_control.backends.mujoco import MujocoBackend
+from robot_control import Pose
+from robot_control.errors import IKError
 
 
 def test_mujoco_model_loads_and_moves():

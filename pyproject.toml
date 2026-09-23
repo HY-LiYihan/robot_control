@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "piper-control"
+name = "robot-control"
 version = "0.1.0"
 description = "Unified Piper and FR3 MuJoCo control, Piper real control and D435i RGB-D"
 readme = "README.md"
@@ -18,15 +18,15 @@ camera = ["pyrealsense2>=2.50", "Pillow>=10"]
 dev = ["pytest>=8", "pytest-cov>=5"]
 
 [project.scripts]
-piper = "piper_control.cli:app"
-robot_control = "piper_control.cli:app"
+piper = "robot_control.cli:app"
+robot_control = "robot_control.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-piper_control = ["assets/scenes/*.xml"]
-"piper_control.fr3" = ["assets/scenes/*.xml"]
+robot_control = ["assets/scenes/*.xml"]
+"robot_control.fr3" = ["assets/scenes/*.xml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

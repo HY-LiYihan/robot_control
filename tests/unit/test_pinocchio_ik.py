@@ -3,9 +3,9 @@ import pytest
 
 pytest.importorskip("pinocchio")
 
-from piper_control import Pose
-from piper_control.backends.piper_model import ASSET_ROOT
-from piper_control.kinematics import PinocchioIK
+from robot_control import Pose
+from robot_control.backends.piper_model import ASSET_ROOT
+from robot_control.kinematics import PinocchioIK
 
 
 @pytest.fixture

@@ -3,8 +3,8 @@ import xml.etree.ElementTree as ET
 
 import numpy as np
 
-from piper_control.backends.collada_visual import NS, visual_meshes
-from piper_control.backends.piper_model import ASSET_ROOT
+from robot_control.backends.collada_visual import NS, visual_meshes
+from robot_control.backends.piper_model import ASSET_ROOT
 
 
 def test_nested_transform_units_and_mirrored_normals(tmp_path):

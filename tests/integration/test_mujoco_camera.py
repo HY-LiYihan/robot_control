@@ -3,9 +3,9 @@ import pytest
 
 pytest.importorskip("mujoco")
 
-from piper_control.backends.mujoco import MujocoBackend
-from piper_control.sensors.mujoco_rgbd import MujocoRGBDCamera
-from piper_control.sensors.extrinsics import piper_link6_to_color_optical, pose_matrix
+from robot_control.backends.mujoco import MujocoBackend
+from robot_control.sensors.mujoco_rgbd import MujocoRGBDCamera
+from robot_control.sensors.extrinsics import piper_link6_to_color_optical, pose_matrix
 
 
 FRAME_NAMES = (

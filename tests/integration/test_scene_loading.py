@@ -5,9 +5,9 @@ import pytest
 
 mujoco = pytest.importorskip("mujoco")
 
-from piper_control import Pose
-from piper_control.backends.mujoco import MujocoBackend
-from piper_control.backends.scene_builder import DEFAULT_SCENE, validate_scene
+from robot_control import Pose
+from robot_control.backends.mujoco import MujocoBackend
+from robot_control.backends.scene_builder import DEFAULT_SCENE, validate_scene
 
 
 @pytest.mark.parametrize("mount", [
@@ -25,7 +25,7 @@ def test_invalid_mount_rejected_before_robot_is_built(tmp_path, monkeypatch, mou
     scene.write_text(f"<mujoco><worldbody>{mount}</worldbody></mujoco>")
     def unexpected_build(*args, **kwargs):
         pytest.fail("The robot/assets must not load before scene validation")
-    monkeypatch.setattr("piper_control.backends.mujoco.build_piper_scene", unexpected_build)
+    monkeypatch.setattr("robot_control.backends.mujoco.build_piper_scene", unexpected_build)
     with pytest.raises(ValueError, match="piper_mount"):
         backend = MujocoBackend(scene=scene)
         backend.connect()

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
-from piper_control.api.types import JointState, Pose
-from piper_control.sensors.frame import CameraIntrinsics, RGBDFrame
+from robot_control.api.types import JointState, Pose
+from robot_control.sensors.frame import CameraIntrinsics, RGBDFrame
 
 
 def test_pose_rejects_zero_quaternion():

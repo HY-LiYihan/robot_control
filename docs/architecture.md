@@ -1,6 +1,6 @@
 # Architecture
 
-`PiperRobot` exposes one typed facade. A backend implements robot lifecycle, state, joint/cartesian motion, gripper and stop.
+`Robot` exposes one typed facade. A backend implements robot lifecycle, state, joint/cartesian motion, gripper and stop.
 
 The real backend delegates Cartesian `move_p` to the pinned Piper SDK/firmware.
 The MuJoCo backend uses Pinocchio on the official six-axis Piper URDF. The IK
@@ -87,4 +87,4 @@ capture available.
 The upstream Isaac asset repository contains DAE paths that differ only by letter case. On case-insensitive macOS filesystems that submodule can appear dirty immediately after checkout, so `.gitmodules` ignores submodule worktree dirt while the pinned gitlink SHA remains authoritative.
 # FR3 selection
 
-`PiperRobot.connect` selects the MuJoCo implementation with a `robot` argument (default `piper`). `fr3/mujoco.py` uses the supplied FR3 MJCF and `fr3/ik.py` the supplied URDF; the existing Piper adapters remain unchanged. `JointState` accepts six or seven positions with matching velocity lengths. `robot_control` is the primary CLI; invoking it with `--backend mujoco` and no subcommand hosts a GUI (or a headless, physically stepped scene with `--no-gui`). Subcommands probe both distinct scene sockets to infer the unique active robot; if both are active, a missing `--robot` is an error. Explicit `--backend real --robot piper` prevents implicit real-arm selection. The shared scene protocol advertises `robot` and rejects cross-robot connections. The server selects `d435i_check` when rendering FR3 RGB-D. There is no FR3 real-arm backend.
+`Robot.connect` selects the MuJoCo implementation with a `robot` argument (default `piper`). `fr3/mujoco.py` uses the supplied FR3 MJCF and `fr3/ik.py` the supplied URDF; the existing Piper adapters remain unchanged. `JointState` accepts six or seven positions with matching velocity lengths. `robot_control` is the primary CLI; invoking it with `--backend mujoco` and no subcommand hosts a GUI (or a headless, physically stepped scene with `--no-gui`). Subcommands probe both distinct scene sockets to infer the unique active robot; if both are active, a missing `--robot` is an error. Explicit `--backend real --robot piper` prevents implicit real-arm selection. The shared scene protocol advertises `robot` and rejects cross-robot connections. The server selects `d435i_check` when rendering FR3 RGB-D. There is no FR3 real-arm backend.

@@ -12,12 +12,12 @@ import numpy as np
 import pytest
 from typer.testing import CliRunner
 
-from piper_control import PiperRobot
-from piper_control import cli, twin
-from piper_control.api.types import JointState, Pose, RobotState
-from piper_control.backends.mujoco import MujocoBackend
-from piper_control.errors import BackendUnavailableError
-from piper_control.scene import SceneClient
+from robot_control import Robot
+from robot_control import cli, twin
+from robot_control.api.types import JointState, Pose, RobotState
+from robot_control.backends.mujoco import MujocoBackend
+from robot_control.errors import BackendUnavailableError
+from robot_control.scene import SceneClient
 
 
 def test_twin_mirrors_feedback_without_stepping_or_simulated_control(monkeypatch):
@@ -95,7 +95,7 @@ def test_twin_mirrors_feedback_without_stepping_or_simulated_control(monkeypatch
         environment = os.environ.copy()
         source_root = str(Path(__file__).resolve().parents[2] / "src")
         environment["PYTHONPATH"] = source_root + os.pathsep + environment.get("PYTHONPATH", "")
-        command = [sys.executable, "-m", "piper_control.cli", "--backend", "real", "--robot", "piper"]
+        command = [sys.executable, "-m", "robot_control.cli", "--backend", "real", "--robot", "piper"]
         for args in (["state"], ["move-joints", "--j1", "0.05", "--j2", "0", "--j3", "0",
                                      "--j4", "0", "--j5", "0", "--j6", "0"]):
             result = subprocess.run(command + args, env=environment, capture_output=True,
@@ -103,7 +103,7 @@ def test_twin_mirrors_feedback_without_stepping_or_simulated_control(monkeypatch
             assert result.returncode == 0, result.stderr
         assert ("move_joints", [0.05, 0.0, 0.0, 0.0, 0.0, 0.0]) in commands
 
-        robot = PiperRobot.connect("real", {"can_name": "can0"})
+        robot = Robot.connect("real", {"can_name": "can0"})
         try:
             assert isinstance(robot._backend, SceneClient)
             np.testing.assert_allclose(robot.state().joints.positions, [0.1, 0.2, -0.3, 0.1, 0.2, 0.3])
@@ -115,7 +115,7 @@ def test_twin_mirrors_feedback_without_stepping_or_simulated_control(monkeypatch
             robot.disconnect()
 
         with pytest.raises(ValueError, match="different CAN"):
-            PiperRobot.connect("twin", {"can_name": "can1"})
+            Robot.connect("twin", {"can_name": "can1"})
         np.testing.assert_allclose(simulation.data.qpos[simulation._arm_qpos], [0.1, 0.2, -0.3, 0.1, 0.2, 0.3])
         np.testing.assert_allclose(simulation.data.qpos[simulation._finger_qpos], [0.02, -0.02])
         feedback[0] = [-0.1, 0.1, -0.2, 0, 0, 0]
@@ -206,4 +206,4 @@ def test_twin_cli_requires_explicit_robot_for_commands_and_rejects_fr3(monkeypat
 def test_twin_client_fails_closed_when_host_is_missing(monkeypatch, tmp_path):
     monkeypatch.setenv("PIPER_TWIN_SOCKET", str(tmp_path / "missing.sock"))
     with pytest.raises(BackendUnavailableError, match="twin is not running"):
-        PiperRobot.connect("twin")
+        Robot.connect("twin")

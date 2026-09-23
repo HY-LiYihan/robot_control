@@ -24,7 +24,7 @@ class MujocoRGBDCamera:
                 raise ValueError(f"MuJoCo D435i camera not found: {self.camera}")
             self._renderer = mujoco.Renderer(self.model, height=self.height, width=self.width)
         except ImportError as exc:
-            raise BackendUnavailableError("Install piper-control[mujoco] for MuJoCo RGB-D") from exc
+            raise BackendUnavailableError("Install robot-control[mujoco] for MuJoCo RGB-D") from exc
 
     def disconnect(self):
         if self._renderer is not None:

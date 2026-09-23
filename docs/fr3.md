@@ -17,7 +17,7 @@ FR3 启动时的七轴初始位姿与执行器目标均为 `[0, 0, 0, -1.57, 0, 
 Python 示例：
 
 ```python
-from piper_control import Robot
+from robot_control import Robot
 
 arm = Robot.connect("mujoco", robot="franka_fr3")
 try:

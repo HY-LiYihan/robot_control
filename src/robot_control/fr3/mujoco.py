@@ -35,7 +35,7 @@ class MujocoBackend:
         try:
             import mujoco
         except ImportError as exc:
-            raise BackendUnavailableError("Install piper-control[mujoco] to use MuJoCo") from exc
+            raise BackendUnavailableError("Install robot-control[mujoco] to use MuJoCo") from exc
         if not self.model_path.is_file():
             raise BackendUnavailableError(f"MuJoCo model not found: {self.model_path}")
         self.model = compile_scene(self.model_path, self.scene_path)

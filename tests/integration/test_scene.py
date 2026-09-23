@@ -6,11 +6,11 @@ import pytest
 
 pytest.importorskip("mujoco")
 
-from piper_control import Pose
-from piper_control import PiperRobot
-from piper_control.backends.mujoco import MujocoBackend
-from piper_control.errors import IKError
-from piper_control.scene import SceneClient, SceneServer
+from robot_control import Pose
+from robot_control import Robot
+from robot_control.backends.mujoco import MujocoBackend
+from robot_control.errors import IKError
+from robot_control.scene import SceneClient, SceneServer
 
 
 @pytest.fixture
@@ -107,7 +107,7 @@ def test_disconnect_lets_new_client_reconnect(scene):
 
 def test_explicit_scene_must_match_running_server(scene, tmp_path):
     server, socket_path = scene
-    matching = PiperRobot.connect("mujoco", {"socket_path": socket_path, "scene": server.backend.scene_path})
+    matching = Robot.connect("mujoco", {"socket_path": socket_path, "scene": server.backend.scene_path})
     try:
         assert isinstance(matching._backend, SceneClient)
         assert matching.state().connected
@@ -116,4 +116,4 @@ def test_explicit_scene_must_match_running_server(scene, tmp_path):
     different = tmp_path / "different.xml"
     different.write_text('<mujoco><worldbody><body name="piper_mount" pos="1 0 0"/></worldbody></mujoco>')
     with pytest.raises(ValueError, match="restart the GUI with --scene"):
-        PiperRobot.connect("mujoco", {"socket_path": socket_path, "scene": different})
+        Robot.connect("mujoco", {"socket_path": socket_path, "scene": different})

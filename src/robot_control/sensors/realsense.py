@@ -14,7 +14,7 @@ class RealSenseCamera:
         try:
             import pyrealsense2 as rs
         except ImportError as exc:
-            raise BackendUnavailableError("Install piper-control[camera] for RealSense support") from exc
+            raise BackendUnavailableError("Install robot-control[camera] for RealSense support") from exc
         self._rs = rs
         config = rs.config()
         config.enable_stream(rs.stream.color, self.width, self.height, rs.format.rgb8, self.fps)

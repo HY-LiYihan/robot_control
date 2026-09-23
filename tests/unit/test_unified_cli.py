@@ -7,14 +7,14 @@ import numpy as np
 from typer.testing import CliRunner
 import pytest
 
-from piper_control import cli
-from piper_control.api.types import Pose
-from piper_control.cli import app
-from piper_control.errors import BackendUnavailableError
-from piper_control.scene import SceneClient, SceneServer
-from piper_control.sensors.frame import CameraIntrinsics, RGBDFrame
-from piper_control.sensors import realsense
-from piper_control.sensors.extrinsics import piper_link6_to_color_optical
+from robot_control import cli
+from robot_control.api.types import Pose
+from robot_control.cli import app
+from robot_control.errors import BackendUnavailableError
+from robot_control.scene import SceneClient, SceneServer
+from robot_control.sensors.frame import CameraIntrinsics, RGBDFrame
+from robot_control.sensors import realsense
+from robot_control.sensors.extrinsics import piper_link6_to_color_optical
 
 
 runner = CliRunner()
@@ -78,7 +78,7 @@ def test_root_launches_gui_for_selected_robot(monkeypatch):
 
 def test_no_gui_hosts_scene_without_viewer(monkeypatch):
     calls = []
-    monkeypatch.setattr("piper_control.mujoco_gui.run_host", lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setattr("robot_control.mujoco_gui.run_host", lambda **kwargs: calls.append(kwargs))
     result = runner.invoke(app, ["--backend", "mujoco", "--robot", "franka_fr3", "--no-gui"])
     assert result.exit_code == 0, result.output
     assert calls == [{"scene": None, "robot": "franka_fr3", "gui": False}]

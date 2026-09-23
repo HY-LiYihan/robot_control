@@ -7,7 +7,7 @@ import subprocess
 import sys
 from typing import Annotated
 import typer
-from .api.robot import PiperRobot
+from .api.robot import Robot
 from .api.types import Pose
 from .errors import BackendUnavailableError
 from .scene import SceneClient
@@ -23,7 +23,7 @@ def _robot_name(robot: str) -> str:
 
 
 def _robot(backend: str, can_name: str, robot: str = "piper"):
-    return PiperRobot.connect(backend, {"can_name": can_name} if backend in ("real", "twin") else {},
+    return Robot.connect(backend, {"can_name": can_name} if backend in ("real", "twin") else {},
                               robot=_robot_name(robot))
 
 
@@ -84,15 +84,15 @@ def _scene_for(robot: str, path: Path | None) -> Path | None:
 
 def _run_scene_host(duration: float, scene: Path | None = None, robot: str = "piper") -> None:
     """Host the shared MuJoCo scene; on macOS re-exec through mjpython for the viewer."""
-    if sys.platform == "darwin" and not os.environ.get("PIPER_MUJOCO_GUI_REEXEC"):
+    if sys.platform == "darwin" and not os.environ.get("ROBOT_CONTROL_MUJOCO_GUI_REEXEC"):
         mjpython = Path(sys.executable).with_name("mjpython")
         if not mjpython.is_file():
-            raise RuntimeError("Install piper-control[mujoco] in this Python environment to provide mjpython")
+            raise RuntimeError("Install robot-control[mujoco] in this Python environment to provide mjpython")
         environment = os.environ.copy()
-        environment["PIPER_MUJOCO_GUI_REEXEC"] = "1"
+        environment["ROBOT_CONTROL_MUJOCO_GUI_REEXEC"] = "1"
         source_root = str(Path(__file__).resolve().parents[1])
         environment["PYTHONPATH"] = source_root + os.pathsep + environment.get("PYTHONPATH", "")
-        command = [str(mjpython), "-m", "piper_control.mujoco_gui", "--duration", str(duration)]
+        command = [str(mjpython), "-m", "robot_control.mujoco_gui", "--duration", str(duration)]
         if robot != "piper":
             command.extend(["--robot", robot])
         if scene is not None:
@@ -104,15 +104,15 @@ def _run_scene_host(duration: float, scene: Path | None = None, robot: str = "pi
 
 
 def _run_twin_host(duration: float, scene: Path | None = None, can_name: str = "can0") -> None:
-    if sys.platform == "darwin" and not os.environ.get("PIPER_MUJOCO_GUI_REEXEC"):
+    if sys.platform == "darwin" and not os.environ.get("ROBOT_CONTROL_MUJOCO_GUI_REEXEC"):
         mjpython = Path(sys.executable).with_name("mjpython")
         if not mjpython.is_file():
-            raise RuntimeError("Install piper-control[mujoco] in this Python environment to provide mjpython")
+            raise RuntimeError("Install robot-control[mujoco] in this Python environment to provide mjpython")
         environment = os.environ.copy()
-        environment["PIPER_MUJOCO_GUI_REEXEC"] = "1"
+        environment["ROBOT_CONTROL_MUJOCO_GUI_REEXEC"] = "1"
         source_root = str(Path(__file__).resolve().parents[1])
         environment["PYTHONPATH"] = source_root + os.pathsep + environment.get("PYTHONPATH", "")
-        command = [str(mjpython), "-m", "piper_control.twin", "--duration", str(duration),
+        command = [str(mjpython), "-m", "robot_control.twin", "--duration", str(duration),
                    "--can-name", can_name]
         if scene is not None:
             command.extend(["--scene", str(scene)])
@@ -382,7 +382,7 @@ def camera(ctx: typer.Context, backend: str | None = None, can_name: str = "can0
         try:
             from PIL import Image
         except ImportError as exc:
-            raise RuntimeError("Install piper-control[camera] to save PNG images") from exc
+            raise RuntimeError("Install robot-control[camera] to save PNG images") from exc
         rgb_out.parent.mkdir(parents=True, exist_ok=True)
         depth_out.parent.mkdir(parents=True, exist_ok=True)
         Image.fromarray(frame.color).save(rgb_out)

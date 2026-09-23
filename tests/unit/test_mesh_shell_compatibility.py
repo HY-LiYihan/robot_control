@@ -3,9 +3,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from piper_control.backends.piper_model import build_piper_scene
-from piper_control.backends.scene_builder import _set_visual_mesh_shell_inertia as set_piper_shell
-from piper_control.fr3.scene_builder import _set_visual_mesh_shell_inertia as set_fr3_shell
+from robot_control.backends.piper_model import build_piper_scene
+from robot_control.backends.scene_builder import _set_visual_mesh_shell_inertia as set_piper_shell
+from robot_control.fr3.scene_builder import _set_visual_mesh_shell_inertia as set_fr3_shell
 
 
 @pytest.mark.parametrize("supported", [False, True])

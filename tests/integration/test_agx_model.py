@@ -7,8 +7,8 @@ import pytest
 
 mujoco = pytest.importorskip("mujoco")
 
-from piper_control.backends.mujoco import MujocoBackend
-from piper_control.backends.piper_model import ASSET_ROOT, ARM_JOINTS, build_piper_scene
+from robot_control.backends.mujoco import MujocoBackend
+from robot_control.backends.piper_model import ASSET_ROOT, ARM_JOINTS, build_piper_scene
 
 
 @pytest.fixture

@@ -6,10 +6,10 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from piper_control.backends.piper_model import ASSET_ROOT
-from piper_control.backends.real import RealBackend
-from piper_control.errors import BackendUnavailableError
-from piper_control.kinematics.ik import PinocchioIK
+from robot_control.backends.piper_model import ASSET_ROOT
+from robot_control.backends.real import RealBackend
+from robot_control.errors import BackendUnavailableError
+from robot_control.kinematics.ik import PinocchioIK
 
 
 def test_real_backend_import_is_lazy():

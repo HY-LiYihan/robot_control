@@ -1,6 +1,6 @@
 # API contract
 
-`Pose.position` uses metres and `Pose.quaternion` uses `(w, x, y, z)`. `PiperRobot.move_joints` takes six Piper or seven FR3 radians. `gripper` takes opening width in metres. `state()` returns the selected arm's joints, gripper state, optional end-effector pose, connection status and timestamps.
+`Pose.position` uses metres and `Pose.quaternion` uses `(w, x, y, z)`. `Robot.move_joints` takes six Piper or seven FR3 radians. `gripper` takes opening width in metres. `state()` returns the selected arm's joints, gripper state, optional end-effector pose, connection status and timestamps.
 
 In MuJoCo, both `state().pose` and `move_p(Pose(...))` use the scene **world**
 frame. The backend transforms targets into the independent Pinocchio model frame
@@ -15,7 +15,7 @@ with an explicit finite three-value `pos` and optional nonzero `quat` (wxyz).
 It cannot be nested, moving, or defined in an include. Other environment content
 supports native includes and relative assets. Validation precedes robot loading.
 
-Python callers can use `PiperRobot.connect("mujoco", {"scene": "scenes/tabletop.xml"})`
+Python callers can use `Robot.connect("mujoco", {"scene": "scenes/tabletop.xml"})`
 or `MujocoBackend(scene="scenes/tabletop.xml")`. If a shared server is already
 running, an explicit scene request must match its resolved scene path, otherwise
 connection raises an error. Omitting `scene` connects to whichever shared scene
@@ -47,4 +47,4 @@ fingers move by +/- half that width. The real backend retains its existing
 change hardware limits or replace firmware IK on the real backend.
 # Robot selection
 
-The default `PiperRobot.connect("mujoco")` remains the six-joint Piper. Use `PiperRobot.connect("mujoco", robot="franka_fr3")` or `Robot.connect(...)` for the seven-joint FR3. The unified CLI uses `robot_control [--backend mujoco|real] [--robot piper|franka_fr3] COMMAND`. Without a command, the MuJoCo backend starts a GUI; `--no-gui` hosts a headless scene. Commands without `--robot` select the single running scene; if both are running, explicitly specify one. Only FR3 requires `--j7` for `move-joints`. `pepper` is accepted as an alias for Piper. Real-arm commands require explicit `--backend real --robot piper`; FR3 real-arm control is unavailable. `robot_control --backend real camera` uses RealSense independently of the arm. See `docs/fr3.md`.
+The default `Robot.connect("mujoco")` remains the six-joint Piper. Use `Robot.connect("mujoco", robot="franka_fr3")` or `Robot.connect(...)` for the seven-joint FR3. The unified CLI uses `robot_control [--backend mujoco|real] [--robot piper|franka_fr3] COMMAND`. Without a command, the MuJoCo backend starts a GUI; `--no-gui` hosts a headless scene. Commands without `--robot` select the single running scene; if both are running, explicitly specify one. Only FR3 requires `--j7` for `move-joints`. `pepper` is accepted as an alias for Piper. Real-arm commands require explicit `--backend real --robot piper`; FR3 real-arm control is unavailable. `robot_control --backend real camera` uses RealSense independently of the arm. See `docs/fr3.md`.
