@@ -193,11 +193,8 @@ class SceneServer:
         if self._camera is None or self._camera_size != (width, height):
             if self._camera is not None:
                 self._camera.disconnect()
-            from .sensors.mujoco_rgbd import MujocoRGBDCamera
-            camera_name = "d435i_check" if self.robot == "franka_fr3" else "d435i_color_optical_camera"
-            self._camera = MujocoRGBDCamera(self.backend.model, self.backend.data,
-                                            camera=camera_name,
-                                            width=width, height=height)
+            from .sensors.service import mujoco_camera
+            self._camera = mujoco_camera(self.backend, self.robot, width, height)
             self._camera.connect()
             self._camera_size = (width, height)
         return self._camera

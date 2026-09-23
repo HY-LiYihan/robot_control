@@ -13,7 +13,7 @@ from robot_control.cli import app
 from robot_control.errors import BackendUnavailableError
 from robot_control.scene import SceneClient, SceneServer
 from robot_control.sensors.frame import CameraIntrinsics, RGBDFrame
-from robot_control.sensors import realsense
+from robot_control.sensors import service
 from robot_control.sensors.extrinsics import piper_link6_to_color_optical
 
 
@@ -37,14 +37,20 @@ def test_real_camera_outputs_base_extrinsics_and_camera_only_mode(monkeypatch, t
                              "d435i_color_optical_frame", CameraIntrinsics(2, 2, 1, 1, 1, 1), 0.001)
 
     class Robot:
+        def __init__(self, backend):
+            self.backend = backend
+
         def state(self):
             return type("State", (), {"pose": Pose((0, 0, 0)), "timestamp": time.time()})()
+
+        def camera(self):
+            return service.CameraService(self.backend, "piper", self).capture()
 
         def disconnect(self):
             pass
 
-    monkeypatch.setattr(realsense, "RealSenseCamera", Camera)
-    monkeypatch.setattr(cli, "_robot", lambda *args: Robot())
+    monkeypatch.setattr(service, "RealSenseCamera", Camera)
+    monkeypatch.setattr(cli, "_robot", lambda backend, *args: Robot(backend))
     output = ["--rgb-out", str(tmp_path / "rgb.png"), "--depth-out", str(tmp_path / "depth.npy")]
     result = runner.invoke(app, ["--backend", "real", "--robot", "piper", "camera", *output])
     assert result.exit_code == 0, result.output

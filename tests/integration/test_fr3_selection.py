@@ -107,7 +107,7 @@ def test_fr3_mujoco_and_shared_scene():
             robot.gripper(.04)
             backend.wait_until_idle(12)
             assert robot.state().joints.gripper == pytest.approx(.04, abs=.001)
-            frame = robot._backend.read(width=160, height=120)
+            frame = robot.camera(width=160, height=120)
             assert frame.extrinsics.reference_frame == "fr3_link0"
             assert frame.extrinsics.camera_frame == frame.frame_id == "d435i_color_optical_frame"
             site = backend.model.site("d435i_color_optical_frame").id

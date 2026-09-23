@@ -4,6 +4,7 @@ import pytest
 pytest.importorskip("mujoco")
 
 from robot_control.backends.mujoco import MujocoBackend
+from robot_control import Robot
 from robot_control.sensors.mujoco_rgbd import MujocoRGBDCamera
 from robot_control.sensors.extrinsics import piper_link6_to_color_optical, pose_matrix
 
@@ -76,6 +77,9 @@ def test_mujoco_rgbd_contract():
             assert np.any(frame.depth > 0.0)
         finally:
             camera.disconnect()
+        api_frame = Robot(backend).camera(width=160, height=120)
+        assert api_frame.color.shape == (120, 160, 3)
+        assert api_frame.extrinsics.reference_frame == "base_link"
     finally:
         backend.disconnect()
 

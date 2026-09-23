@@ -76,21 +76,21 @@ def test_client_propagates_ik_error(scene):
 
 def test_client_camera_round_trip(scene):
     _, socket_path = scene
-    client = _client(socket_path)
+    robot = Robot.connect(config={"socket_path": socket_path})
     try:
-        frame = client.read()
+        frame = robot.camera(width=160, height=120)
         assert frame.extrinsics is not None
         assert frame.extrinsics.reference_frame == "base_link"
         assert frame.extrinsics.camera_frame == frame.frame_id
         assert frame.extrinsics.timestamp == frame.timestamp
-        assert frame.color.shape == (720, 1280, 3)
+        assert frame.color.shape == (120, 160, 3)
         assert frame.color.dtype == np.uint8
-        assert frame.depth.shape == (720, 1280)
+        assert frame.depth.shape == (120, 160)
         assert frame.depth.dtype == np.float32
         assert frame.depth_scale == 1.0
         assert np.isfinite(frame.depth).all()
     finally:
-        client.disconnect()
+        robot.disconnect()
 
 
 def test_disconnect_lets_new_client_reconnect(scene):

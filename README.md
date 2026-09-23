@@ -25,7 +25,7 @@ python -m pip install -e ".[mujoco,dev]"
 pip install -e ".[real,camera]"  # 需要真机/RealSense 时
 ```
 
-FR3 的 `vendor` 模型目录按源码路径读取，使用上述**可编辑安装**。`[real]` 仅用于 Piper 真机；FR3 真机运动控制未实现，也未进行硬件测试。Piper twin 同时需要 `[mujoco,real]`，采集真相机还需 `[camera]`。真相机取帧可独立使用 `robot_control --backend real camera`。
+FR3 的 `vendor` 模型目录按源码路径读取，使用上述**可编辑安装**。`[real]` 仅用于 Piper 真机；FR3 真机运动控制未实现，也未进行硬件测试。Piper twin 同时需要 `[mujoco,real]`，采集真相机还需 `[camera]`。真相机取帧可独立使用 `robot_control --backend real camera --no-extrinsics`。
 
 ## 统一命令与自动选择
 
@@ -61,7 +61,7 @@ robot_control stop
 ```bash
 robot_control --backend real --robot piper state
 robot_control --backend real --robot piper gripper 0.02
-robot_control --backend real camera   # 仅采集本机 D435i，无需连接机械臂
+robot_control --backend real camera --no-extrinsics   # 仅采集本机 D435i，无需连接机械臂
 ```
 
 FR3 真机运动控制 (`--backend real --robot franka_fr3`) 会明确报错。Python API 使用 `Robot.connect("mujoco", robot="franka_fr3")` 或 `Robot.connect(...)`。FR3 场景必须包含 `fr3_mount`，Piper 场景仍使用 `piper_mount`，参见 `docs/fr3.md`。
@@ -101,9 +101,12 @@ robot.wait_until_idle()
 robot.move_p(target)
 robot.wait_until_idle()
 print(robot.state())
+frame = robot.camera(width=640, height=480)  # RGB-D + 相机相对机器人基座的外参
 robot.stop()
 robot.disconnect()
 ```
+
+`Robot.camera()` 在独立仿真或共享 MuJoCo 场景中读取仿真相机；在 Piper `real` / `twin` 中读取真机 RealSense，并在有同步关节反馈时提供基座外参。只采真相机、完全不连接机械臂时，可用 `robot_control --backend real camera --no-extrinsics`，或在 Python 中调用 `CameraService("real", include_extrinsics=False).capture()`（从 `robot_control.sensors.service` 导入）。真机控制及包含外参的真机相机命令仍须显式指定 `--backend real --robot piper`；FR3 真机暂不可用。
 
 ## Piper 场景与坐标细节
 

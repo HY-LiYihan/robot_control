@@ -11,15 +11,17 @@ from .api.robot import Robot
 from .api.types import Pose
 from .errors import BackendUnavailableError
 from .scene import SceneClient
+from .selection import BACKENDS, ROBOT_BACKENDS, normalize_robot, validate_backend_robot
+from .sensors.service import CameraService
 
 app = typer.Typer(help="Piper (default) and Franka FR3 control and D435i RGB-D CLI")
 
 
 def _robot_name(robot: str) -> str:
-    selected = "piper" if robot == "pepper" else robot
-    if selected not in ("piper", "franka_fr3"):
-        raise typer.BadParameter("choose piper or franka_fr3", param_hint="--robot")
-    return selected
+    try:
+        return normalize_robot(robot)
+    except ValueError as exc:
+        raise typer.BadParameter("choose piper or franka_fr3", param_hint="--robot") from exc
 
 
 def _robot(backend: str, can_name: str, robot: str = "piper"):
@@ -29,7 +31,7 @@ def _robot(backend: str, can_name: str, robot: str = "piper"):
 
 def _active_robot() -> str | None:
     active = []
-    for name in ("piper", "franka_fr3"):
+    for name in ROBOT_BACKENDS:
         client = SceneClient(robot=name)
         try:
             client.connect()
@@ -56,7 +58,7 @@ def _selection(ctx: typer.Context, backend: str | None = None, robot: str | None
     if robot is not None and global_robot is not None and _robot_name(robot) != _robot_name(global_robot):
         raise typer.BadParameter("conflicting --robot options", param_hint="--robot")
     selected_backend = backend or global_backend or "mujoco"
-    if selected_backend not in ("mujoco", "real", "twin"):
+    if selected_backend not in BACKENDS:
         raise typer.BadParameter("choose mujoco, real or twin", param_hint="--backend")
     explicit_robot = robot or global_robot
     if (selected_backend in ("real", "twin") and not camera and explicit_robot is None
@@ -64,8 +66,10 @@ def _selection(ctx: typer.Context, backend: str | None = None, robot: str | None
         raise typer.BadParameter("real-robot control requires --robot piper", param_hint="--robot")
     selected_robot = (_robot_name(explicit_robot) if explicit_robot is not None else
                       "piper" if launch or selected_backend in ("real", "twin") else _active_robot() or "piper")
-    if selected_backend in ("real", "twin") and selected_robot == "franka_fr3":
-        raise typer.BadParameter("FR3 real-robot control is not implemented", param_hint="--robot")
+    try:
+        validate_backend_robot(selected_backend, selected_robot)
+    except BackendUnavailableError as exc:
+        raise typer.BadParameter(str(exc), param_hint="--robot") from exc
     return selected_backend, selected_robot
 
 
@@ -344,40 +348,14 @@ def camera(ctx: typer.Context, backend: str | None = None, can_name: str = "can0
     """Capture aligned wrist RGB-D and its base-to-color-optical extrinsics."""
     backend, selected = _selection(ctx, backend, robot, camera=True)
     instance = None
-    if backend in ("real", "twin"):
-        if not no_extrinsics:
-            if robot is None and ctx.obj.get("robot") is None:
-                raise typer.BadParameter("real camera extrinsics require --robot piper", param_hint="--robot")
-            if selected != "piper":
-                raise typer.BadParameter("FR3 real-robot control is not implemented", param_hint="--robot")
-            instance = _robot("real", can_name, selected)
-        from .sensors.realsense import RealSenseCamera
-        cam = RealSenseCamera(frame_id="d435i_color_optical_frame")
-    elif backend == "mujoco":
-        instance = _robot("mujoco", can_name, selected)
-        impl = instance._backend
-        if hasattr(impl, "read"):
-            cam = impl  # shared-scene client renders from the running scene
-        else:
-            from .sensors.mujoco_rgbd import MujocoRGBDCamera
-            cam = MujocoRGBDCamera(impl.model, impl.data,
-                                  camera="d435i_check" if selected == "franka_fr3" else "d435i_color_optical_camera")
-    else:
-        raise typer.BadParameter(f"unknown backend: {backend}")
     try:
-        cam.connect()
-        try:
-            frame = cam.read()
-        finally:
-            cam.disconnect()
-        if backend in ("real", "twin") and not no_extrinsics:
-            from .sensors.extrinsics import camera_extrinsics, piper_link6_to_color_optical, pose_matrix
-            state = instance.state()
-            if abs(state.timestamp - frame.timestamp) > 1.0:
-                raise BackendUnavailableError("Piper joint feedback and camera capture are not synchronized")
-            frame.extrinsics = camera_extrinsics(
-                pose_matrix(state.pose) @ piper_link6_to_color_optical(),
-                "base_link", frame.frame_id, state.timestamp)
+        if backend in ("real", "twin") and no_extrinsics:
+            frame = CameraService(backend, selected, include_extrinsics=False).capture()
+        else:
+            if backend in ("real", "twin") and robot is None and ctx.obj.get("robot") is None:
+                raise typer.BadParameter("real camera extrinsics require --robot piper", param_hint="--robot")
+            instance = _robot(backend, can_name, selected)
+            frame = instance.camera()
         import numpy as np
         try:
             from PIL import Image

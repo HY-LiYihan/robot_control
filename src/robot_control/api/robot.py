@@ -7,27 +7,35 @@ from ..backends.mujoco import MujocoBackend
 from ..backends.real import RealBackend
 from ..errors import BackendUnavailableError
 from ..scene import SceneClient, twin_socket_path
+from ..selection import normalize_robot, validate_backend_robot
+from ..sensors.frame import RGBDFrame
 
 
 class Robot:
     def __init__(self, backend: RobotBackend):
         self._backend = backend
+        self._selected_backend = "mujoco"
+        self._selected_robot = "piper"
+
+    @classmethod
+    def _attached(cls, impl: RobotBackend, backend: str, robot: str) -> "Robot":
+        instance = cls(impl)
+        instance._selected_backend = backend
+        instance._selected_robot = robot
+        return instance
 
     @classmethod
     def connect(cls, backend: str = "mujoco", config: dict[str, Any] | None = None,
                 robot: str = "piper") -> "Robot":
         config = dict(config or {})
-        robot = "piper" if robot == "pepper" else robot
+        robot = normalize_robot(robot)
         if "robot" in config:
-            selected = "piper" if config["robot"] == "pepper" else config["robot"]
+            selected = normalize_robot(config["robot"])
             if robot != "piper" and robot != selected:
                 raise ValueError("conflicting robot selections")
             config.pop("robot")
             robot = selected
-        if robot not in ("piper", "franka_fr3"):
-            raise ValueError(f"unknown robot: {robot}; choose piper or franka_fr3")
-        if robot == "franka_fr3" and backend in ("real", "twin"):
-            raise BackendUnavailableError("FR3 real-robot control is not implemented; use --backend mujoco")
+        validate_backend_robot(backend, robot)
         if config.get("scene") is not None and backend != "mujoco":
             raise ValueError("scene is only supported by the MuJoCo backend")
         if backend in ("real", "twin"):
@@ -49,7 +57,7 @@ class Robot:
                 except Exception:
                     twin.disconnect()
                     raise
-                return cls(twin)
+                return cls._attached(twin, backend, robot)
         requested_scene = None
         if config.get("scene") is not None:
             if backend != "mujoco":
@@ -75,7 +83,7 @@ class Robot:
                 else:
                     impl = MujocoBackend(**config)
                 impl.connect()
-                return cls(impl)
+                return cls._attached(impl, backend, robot)
             try:
                 info = scene.scene_info()
                 if info.get("robot", "piper") != robot:
@@ -91,19 +99,24 @@ class Robot:
                 except Exception:
                     scene.disconnect()
                     raise
-            return cls(scene)
+            return cls._attached(scene, backend, robot)
         elif backend == "real":
             impl = RealBackend(**config)
         else:
             raise ValueError(f"unknown backend: {backend}")
         impl.connect()
-        return cls(impl)
+        return cls._attached(impl, backend, robot)
 
     def disconnect(self) -> None:
         self._backend.disconnect()
 
     def state(self) -> RobotState:
         return self._backend.state()
+
+    def camera(self, width: int = 1280, height: int = 720) -> RGBDFrame:
+        from ..sensors.service import CameraService
+        return CameraService(self._selected_backend, self._selected_robot, self._backend,
+                             width=width, height=height).capture()
 
     def move_joints(self, joints: Sequence[float]) -> None:
         self._backend.move_joints(joints)

@@ -47,4 +47,18 @@ fingers move by +/- half that width. The real backend retains its existing
 change hardware limits or replace firmware IK on the real backend.
 # Robot selection
 
-The default `Robot.connect("mujoco")` remains the six-joint Piper. Use `Robot.connect("mujoco", robot="franka_fr3")` or `Robot.connect(...)` for the seven-joint FR3. The unified CLI uses `robot_control [--backend mujoco|real] [--robot piper|franka_fr3] COMMAND`. Without a command, the MuJoCo backend starts a GUI; `--no-gui` hosts a headless scene. Commands without `--robot` select the single running scene; if both are running, explicitly specify one. Only FR3 requires `--j7` for `move-joints`. `pepper` is accepted as an alias for Piper. Real-arm commands require explicit `--backend real --robot piper`; FR3 real-arm control is unavailable. `robot_control --backend real camera` uses RealSense independently of the arm. See `docs/fr3.md`.
+The default `Robot.connect("mujoco")` remains the six-joint Piper. Use `Robot.connect("mujoco", robot="franka_fr3")` for the seven-joint FR3. The unified CLI uses `robot_control [--backend mujoco|real|twin] [--robot piper|franka_fr3] COMMAND`. Without a command, the MuJoCo backend starts a GUI; `--no-gui` hosts a headless scene. MuJoCo commands without `--robot` select the single running scene; if both are running, explicitly specify one. Only FR3 requires `--j7` for `move-joints`. `pepper` is accepted as an alias for Piper. Real-arm commands require explicit `--backend real --robot piper` (or `--backend twin --robot piper` with the twin running); FR3 real-arm control is unavailable. `robot_control --backend real camera --no-extrinsics` uses RealSense independently of the arm. See `docs/fr3.md`.
+
+# Camera access
+
+`Robot.camera(width=1280, height=720)` returns an `RGBDFrame` for either a standalone or shared MuJoCo scene, or for the Piper `real` / `twin` backend. The frame contains RGB, depth, intrinsics, and camera-to-base extrinsics; real-arm extrinsics require synchronized arm feedback. Connect with `Robot.connect(...)`, capture, then call `robot.disconnect()`. The twin's camera is the real RealSense, not the simulation renderer.
+
+For a RealSense capture without connecting the arm, use `robot_control --backend real camera --no-extrinsics` or:
+
+```python
+from robot_control.sensors.service import CameraService
+
+frame = CameraService("real", include_extrinsics=False).capture()
+```
+
+The camera-only frame has no extrinsics. CLI real-arm commands and real camera captures **with** extrinsics still require explicit `--backend real --robot piper`; FR3 real-arm control is not available.
