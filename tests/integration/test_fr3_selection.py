@@ -82,7 +82,7 @@ def test_fr3_mujoco_and_shared_scene():
 
     backend = MujocoBackend()
     backend.connect()
-    expected_home = np.array([0, 0, 0, -1.57, 0, 1.57, .785])
+    expected_home = np.array([0, -0.7854, 0, -2.3562, 0, 1.5708, .7854])
     np.testing.assert_allclose(backend.state().joints.positions, expected_home, atol=1e-9)
     np.testing.assert_allclose(backend.data.ctrl[backend._arm_actuators], expected_home, atol=1e-9)
     assert backend.state().joints.gripper == pytest.approx(0.08)
