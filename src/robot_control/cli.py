@@ -29,14 +29,6 @@ def _robot(backend: str, can_name: str, robot: str = "piper", **config):
     return Robot.connect(backend, {**options, **config}, robot=_robot_name(robot))
 
 
-def _confirm_franka(word: str, current: object, target: object) -> bool:
-    typer.echo(f"current: {current}\ntarget: {target}")
-    if input(f"Check clearance, then type {word} to execute: ").strip() != word:
-        typer.echo("Cancelled; no command sent.")
-        return False
-    return True
-
-
 def _active_robot() -> str | None:
     active = []
     for name in ROBOT_BACKENDS:
@@ -257,10 +249,6 @@ def move_joints(
     options = {"motion_duration_s": duration} if duration is not None else {}
     instance = _robot(backend, can_name, selected, **options)
     try:
-        if backend in ("real", "twin") and selected == "franka_fr3":
-            preview = {"joints_rad": joints, "duration_s": instance._backend.motion_duration_s}
-            if not _confirm_franka("MOVE_JOINTS", instance.state().joints.positions.tolist(), preview):
-                return
         instance.move_joints(joints)
         if backend == "mujoco":
             instance.wait_until_idle()
@@ -294,10 +282,6 @@ def move_p(
         elif any(value is None for value in quaternion):
             raise typer.BadParameter("provide all four quaternion options or none")
         target = Pose((x, y, z), tuple(float(value) for value in quaternion))
-        if backend in ("real", "twin") and robot == "franka_fr3":
-            preview = {"pose": target, "duration_s": instance._backend.motion_duration_s}
-            if not _confirm_franka("MOVE_POSE", instance.state().pose, preview):
-                return
         instance.move_p(target)
         if backend == "mujoco":
             instance.wait_until_idle()
@@ -318,10 +302,6 @@ def gripper(ctx: typer.Context, width: float, effort: float | None = None, backe
     options = {"gripper_speed_m_s": speed} if speed is not None else {}
     instance = _robot(backend, can_name, robot, **options)
     try:
-        if backend in ("real", "twin") and robot == "franka_fr3":
-            preview = {"width_m": width, "speed_m_s": instance._backend.gripper_speed_m_s}
-            if not _confirm_franka("MOVE_GRIPPER", instance.state().joints.gripper, preview):
-                return
         instance.gripper(width, effort)
         if backend == "mujoco":
             instance.wait_until_idle()

@@ -115,12 +115,17 @@ def test_fr3_twin_mirrors_feedback_and_routes_real_commands(monkeypatch):
         motion = ["--backend", "twin", "--robot", "franka_fr3", "move-joints",
                   "--j1", "0", "--j2", "-0.6", "--j3", "0", "--j4", "-2",
                   "--j5", "0", "--j6", "1.5", "--j7", "0.4"]
-        denied = runner.invoke(cli.app, motion, input="NO\n")
-        assert denied.exit_code == 0, denied.output
-        assert not any(isinstance(command, tuple) and command[0] == "move_joints" for command in commands)
-        accepted = runner.invoke(cli.app, motion, input="MOVE_JOINTS\n")
+        accepted = runner.invoke(cli.app, motion)
         assert accepted.exit_code == 0, accepted.output
         assert ("move_joints", [0.0, -0.6, 0.0, -2.0, 0.0, 1.5, 0.4]) in commands
+        moved_pose = runner.invoke(cli.app, ["--backend", "real", "--robot", "franka_fr3",
+                                              "move-p", "--x", "0.5", "--y", "0", "--z", "0.4"])
+        assert moved_pose.exit_code == 0, moved_pose.output
+        assert any(isinstance(command, tuple) and command[0] == "move_p" for command in commands)
+        moved_gripper = runner.invoke(cli.app, ["--backend", "twin", "--robot", "franka_fr3",
+                                                 "gripper", "0.04"])
+        assert moved_gripper.exit_code == 0, moved_gripper.output
+        assert ("gripper", 0.04) in commands
         assert commands.count("connect") == 1
         for attempt in range(60):
             if np.allclose(simulation.data.qpos[simulation._arm_qpos], positions):

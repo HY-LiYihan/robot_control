@@ -131,15 +131,40 @@ def test_direct_gripper_stop_and_orientation_guard(bindings):
     assert backend._robot.stopped
 
 
-def test_franka_real_cli_needs_confirmation(bindings):
+def test_franka_real_cli_executes_without_confirmation(bindings, monkeypatch):
+    monkeypatch.setenv("FRANKA_MOVE_DURATION_S", "0.02")
+    robots = []
+    grippers = []
+
+    def make_robot(address):
+        robot = FakeRobot(address)
+        robots.append(robot)
+        return robot
+
+    def make_gripper(address):
+        gripper = FakeGripper(address)
+        grippers.append(gripper)
+        return gripper
+
+    bindings.Robot = make_robot
+    bindings.Gripper = make_gripper
     runner = CliRunner()
     common = ["--backend", "real", "--robot", "franka_fr3"]
     assert runner.invoke(app, common + ["state"]).exit_code == 0
-    denied = runner.invoke(app, common + ["move-joints", "--j1", "0", "--j2", "0",
+    joints = runner.invoke(app, common + ["move-joints", "--j1", "0", "--j2", "0",
                                            "--j3", "0", "--j4", "0", "--j5", "0",
-                                           "--j6", "0", "--j7", "0"], input="no\n")
-    assert denied.exit_code == 0, denied.output
-    assert "Cancelled; no command sent." in denied.output
+                                           "--j6", "0", "--j7", "0"])
+    assert joints.exit_code == 0, joints.output
+    assert robots[-1].control.commands[-1].motion_finished
+    pose = runner.invoke(app, common + ["move-p", "--x", "0.5", "--y", "0", "--z", "0.4"])
+    assert pose.exit_code == 0, pose.output
+    assert robots[-1].control.commands[-1].motion_finished
+    gripper = runner.invoke(app, common + ["gripper", "0.04"])
+    assert gripper.exit_code == 0, gripper.output
+    assert grippers[-1].moves == [(0.04, 0.05)]
+    invalid_gripper = runner.invoke(app, common + ["gripper", "0.09"])
+    assert invalid_gripper.exit_code != 0
+    assert grippers[-1].moves == []
 
 
 def test_franka_twin_remains_unavailable(bindings):
