@@ -53,6 +53,18 @@ def test_real_backend_rejects_missing_feedback():
         backend.state()
 
 
+def test_real_backend_accepts_wrapped_arm_status():
+    backend = RealBackend()
+    backend._sdk = type("Sdk", (), {
+        "GetArmStatus": lambda self: SimpleNamespace(
+            time_stamp=time.time(),
+            arm_status=SimpleNamespace(arm_status=0),
+        ),
+    })()
+    backend._connected = True
+    assert backend._arm_status_error() is None
+
+
 def test_passive_real_connection_and_gripper_feedback(monkeypatch):
     calls = []
 

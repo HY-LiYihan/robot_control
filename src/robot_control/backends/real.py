@@ -113,7 +113,8 @@ class RealBackend:
         status = self._arm_status()
         if status is None:
             return None
-        arm_status = int(getattr(status, "arm_status", 0))
+        arm_status_value = getattr(status, "arm_status", 0)
+        arm_status = int(getattr(arm_status_value, "arm_status", arm_status_value))
         if arm_status == 0:
             return None
         return f"Piper arm_status={arm_status}; command was rejected or stopped"
