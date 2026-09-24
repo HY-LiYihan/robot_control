@@ -4,6 +4,7 @@ from typing import Any, Sequence
 from .protocols import RobotBackend
 from .types import Pose, RobotState
 from ..backends.mujoco import MujocoBackend
+from ..backends.joint_trajectory import positive_duration
 from ..backends.real import RealBackend
 from ..errors import BackendUnavailableError
 from ..scene import SceneClient, twin_socket_path
@@ -36,6 +37,8 @@ class Robot:
             config.pop("robot")
             robot = selected
         validate_backend_robot(backend, robot)
+        if robot == "piper" and backend in ("real", "twin") and "motion_duration_s" in config:
+            raise ValueError("Piper real motion does not support motion_duration_s")
         if config.get("scene") is not None and backend != "mujoco":
             raise ValueError("scene is only supported by the MuJoCo backend")
         if backend in ("real", "twin"):
@@ -80,7 +83,8 @@ class Robot:
             config["scene"] = requested_scene
         if backend == "mujoco":
             socket_path = config.pop("socket_path", None)
-            scene = SceneClient(socket_path=socket_path, robot=robot)
+            scene = SceneClient(socket_path=socket_path, robot=robot,
+                                motion_duration_s=config.get("motion_duration_s"))
             try:
                 scene.connect()
             except BackendUnavailableError:
@@ -132,11 +136,21 @@ class Robot:
         return CameraService(self._selected_backend, self._selected_robot, self._backend,
                              width=width, height=height).capture()
 
-    def move_joints(self, joints: Sequence[float]) -> None:
-        self._backend.move_joints(joints)
+    def move_joints(self, joints: Sequence[float], duration_s: float | None = None) -> None:
+        if duration_s is not None:
+            if self._selected_robot == "piper" and self._selected_backend != "mujoco":
+                raise ValueError("Piper real motion does not support duration_s")
+            self._backend.move_joints(joints, duration_s=positive_duration(duration_s))
+        else:
+            self._backend.move_joints(joints)
 
-    def move_p(self, pose: Pose) -> None:
-        self._backend.move_p(pose)
+    def move_p(self, pose: Pose, duration_s: float | None = None) -> None:
+        if duration_s is not None:
+            if self._selected_robot == "piper" and self._selected_backend != "mujoco":
+                raise ValueError("Piper real motion does not support duration_s")
+            self._backend.move_p(pose, duration_s=positive_duration(duration_s))
+        else:
+            self._backend.move_p(pose)
 
     def gripper(self, width: float, effort: float | None = None) -> None:
         self._backend.gripper(width, effort)

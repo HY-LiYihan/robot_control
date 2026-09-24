@@ -16,6 +16,7 @@ from ..sensors.extrinsics import (ORDINARY_LINK6_FROM_V100_LINK6,
                                   PIPER_CAMERA_LINK_OFFSET, PIPER_COLOR_FRAME_OFFSET,
                                   PIPER_OPTICAL_RPY)
 from .piper_model import ASSET_ROOT, DEFAULT_MODEL, ARM_JOINTS, FINGER_JOINTS, build_piper_scene
+from .joint_trajectory import JointTrajectory, positive_duration
 from .scene_builder import MOUNT_NAME, compile_scene, validate_scene
 
 
@@ -30,7 +31,7 @@ class MujocoBackend:
     def __init__(self, model_path: str | Path = DEFAULT_MODEL, realtime: bool = False,
                  settle_steps: int = 200, wrist_camera: bool = True,
                  ik_urdf: str | Path = ASSET_ROOT / "piper/urdf/piper_description.urdf",
-                 scene: str | Path | None = None, **_: object):
+                 scene: str | Path | None = None, motion_duration_s: float = 2.0, **_: object):
         self.model_path = Path(model_path)
         self.scene_path = None
         if self.model_path.suffix in (".urdf", ".xacro"):
@@ -38,6 +39,8 @@ class MujocoBackend:
         elif scene is not None:
             raise ValueError("scene requires the Piper URDF/Xacro component; a custom model_path XML is already a complete model")
         self.realtime = realtime
+        self.motion_duration_s = positive_duration(motion_duration_s)
+        self._motion: JointTrajectory | None = None
         if settle_steps < 1:
             raise ValueError("settle_steps must be positive")
         self.settle_steps = settle_steps
@@ -368,6 +371,7 @@ class MujocoBackend:
 
     def disconnect(self) -> None:
         self._connected = False
+        self._motion = None
         self.model = self.data = self.ik = None
 
     def _step(self, steps: int = 1, *, pace: bool = True) -> None:
@@ -377,6 +381,11 @@ class MujocoBackend:
         import mujoco
         started = time.monotonic()
         for _ in range(steps):
+            if self._motion is not None:
+                next_time = self.data.time + self.model.opt.timestep
+                self.data.ctrl[self._arm_actuators] = self._motion.at(next_time)
+                if self._motion.finished(next_time):
+                    self._motion = None
             mujoco.mj_step(self.model, self.data)
         if self.realtime and pace:
             elapsed = time.monotonic() - started
@@ -419,27 +428,28 @@ class MujocoBackend:
         joints = JointState(self.data.qpos[self._arm_qpos].copy(), self.data.qvel[self._arm_dofs].copy(), gripper_width)
         arm_error = self.data.ctrl[self._arm_actuators] - joints.positions
         finger_error = self.data.ctrl[self._finger_actuators] - fingers
-        moving = bool(np.max(np.abs(arm_error)) > 1e-3
+        moving = bool(self._motion is not None or np.max(np.abs(arm_error)) > 1e-3
                       or np.max(np.abs(joints.velocities)) > 1e-2
                       or np.max(np.abs(finger_error)) > 2e-4
                       or np.max(np.abs(self.data.qvel[self._finger_dofs])) > 2e-3)
         return RobotState(True, moving, joints, pose)
 
-    def move_joints(self, joints) -> None:
+    def move_joints(self, joints, duration_s: float | None = None) -> None:
         self._require()
         q = np.asarray(joints, dtype=float)
         if q.shape != (6,) or not np.isfinite(q).all():
             raise ValueError("move_joints requires six finite joint values in radians")
         q = np.clip(q, self.ik.lower, self.ik.upper)
-        # Position setpoints are control inputs, not measured joint positions.
-        self.data.ctrl[self._arm_actuators] = q
+        self._motion = JointTrajectory(self.data.qpos[self._arm_qpos], q, self.data.time,
+                                       self.motion_duration_s if duration_s is None else duration_s)
+        self.data.ctrl[self._arm_actuators] = self._motion.start
 
-    def move_p(self, pose: Pose) -> None:
+    def move_p(self, pose: Pose, duration_s: float | None = None) -> None:
         self._require()
         result = self.ik.solve(self._transform_ik_pose(pose, inverse=True), seed=self.data.qpos[self._arm_qpos])
         if not result.success:
             raise IKError(f"Pinocchio IK failed: {result.message}; position={result.position_error:.6g}; orientation={result.orientation_error:.6g}")
-        self.move_joints(result.joints)
+        self.move_joints(result.joints, duration_s=duration_s)
 
     def gripper(self, width: float, effort: float | None = None) -> None:
         self._require()
@@ -450,5 +460,6 @@ class MujocoBackend:
 
     def stop(self) -> None:
         self._require()
+        self._motion = None
         self.data.ctrl[self._arm_actuators] = self.data.qpos[self._arm_qpos]
         self.data.ctrl[self._finger_actuators] = self.data.qpos[self._finger_qpos]

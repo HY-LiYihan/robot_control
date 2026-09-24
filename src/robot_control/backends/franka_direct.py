@@ -15,6 +15,7 @@ import numpy as np
 
 from ..api.types import JointState, Pose, RobotState
 from ..errors import BackendUnavailableError, NotConnectedError
+from .joint_trajectory import positive_duration
 
 
 def _bindings():
@@ -191,7 +192,7 @@ class FrankaDirectBackend:
                                      gripper=float(hand.width), timestamp=stamp),
                           Pose(_xyz(matrix), (w, x, y, z)), "; ".join(errors) or None, stamp)
 
-    def _run(self, control, initialize, command_at):
+    def _run(self, control, initialize, command_at, duration_s: float):
         elapsed = 0.0
         first = True
         with _realtime(self.rt_priority):
@@ -203,7 +204,7 @@ class FrankaDirectBackend:
                     first = False
                 else:
                     elapsed += period.to_sec()
-                    progress = min(elapsed / self.motion_duration_s, 1.0)
+                    progress = min(elapsed / duration_s, 1.0)
                 blend = 10 * progress**3 - 15 * progress**4 + 6 * progress**5
                 command = command_at(blend)
                 command.motion_finished = progress >= 1.0
@@ -211,7 +212,8 @@ class FrankaDirectBackend:
                 if command.motion_finished:
                     return
 
-    def move_joints(self, joints: Sequence[float]) -> None:
+    def move_joints(self, joints: Sequence[float], duration_s: float | None = None) -> None:
+        duration = positive_duration(self.motion_duration_s if duration_s is None else duration_s)
         target = np.asarray(joints, dtype=float)
         if target.shape != (7,) or not np.isfinite(target).all():
             raise ValueError("move_joints requires seven finite joint values in radians")
@@ -234,9 +236,10 @@ class FrankaDirectBackend:
             return self._bindings.JointPositions([left + blend * (right - left)
                                                    for left, right in zip(start, target)])
 
-        self._run(control, initialize, command_at)
+        self._run(control, initialize, command_at, duration)
 
-    def move_p(self, pose: Pose) -> None:
+    def move_p(self, pose: Pose, duration_s: float | None = None) -> None:
+        duration = positive_duration(self.motion_duration_s if duration_s is None else duration_s)
         target_position = tuple(float(value) for value in pose.position)
         if not all(math.isfinite(value) for value in target_position):
             raise ValueError("target position must be finite")
@@ -274,7 +277,7 @@ class FrankaDirectBackend:
             quaternion = _slerp(start["quaternion"], target_quaternion, blend)
             return _pose_command(self._bindings, position, quaternion)
 
-        self._run(control, initialize, command_at)
+        self._run(control, initialize, command_at, duration)
 
     def gripper(self, width: float, effort: float | None = None) -> None:
         if effort is not None:

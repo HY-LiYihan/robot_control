@@ -38,12 +38,25 @@ def test_client_round_trip_joints_gripper_and_pose(scene):
     client = _client(socket_path)
     try:
         target = [0.1, 0.5, -0.5, 0.0, 0.0, 0.0]
-        client.move_joints(target)
+        client.move_joints(target, duration_s=0.25)
+        assert server.backend._motion.duration == 0.25
         assert client.state().moving
         np.testing.assert_allclose(server.backend.data.qpos[server.backend._arm_qpos], PIPER_INITIAL_JOINTS_RAD)
         with server.lock:
             server.backend.wait_until_idle()
         assert np.max(np.abs(client.state().joints.positions - target)) < 0.02
+
+        from robot_control import Robot
+        robot = Robot.connect("mujoco", {"socket_path": socket_path, "motion_duration_s": 0.4})
+        try:
+            robot.move_joints(target)
+            assert server.backend._motion.duration == 0.4
+            robot.move_joints(target, duration_s=0.2)
+            assert server.backend._motion.duration == 0.2
+            with server.lock:
+                server.backend.wait_until_idle()
+        finally:
+            robot.disconnect()
 
         client.gripper(0.03)
         with server.lock:
@@ -54,7 +67,8 @@ def test_client_round_trip_joints_gripper_and_pose(scene):
         # nearby seed. The old model's hard-coded home position is no longer valid.
         target_pose = server.backend.ik.forward([0.2, 0.8, -1.2, 0.2, -0.3, 0.4])
         before = server.backend.data.qpos.copy()
-        client.move_p(target_pose)
+        client.move_p(target_pose, duration_s=0.3)
+        assert server.backend._motion.duration == 0.3
         np.testing.assert_array_equal(server.backend.data.qpos, before)
         with server.lock:
             server.backend.wait_until_idle()

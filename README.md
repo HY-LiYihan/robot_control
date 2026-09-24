@@ -56,6 +56,8 @@ robot_control stop
 
 控制命令的 `--robot` 选择顺序为：显式指定 > 当前唯一运行的 MuJoCo 场景 > 无场景时默认 Piper（独立仿真）。Piper 和 FR3 场景同时运行时，必须显式指定 `--robot`，例如 `robot_control --robot franka_fr3 state`。两种机器人的 GUI 使用不同 socket，客户端不会误连另一种机器人。FR3 `move-joints` 必须传 `--j7`，Piper 不可传。
 
+仿真机械臂关节和末端运动使用平滑轨迹：Piper 默认 2 秒，FR3 默认 4 秒；用子命令 `--duration 秒数` 覆盖，例如 `robot_control --backend mujoco --robot piper move-joints --j1 0 --j2 0.5 --j3 -0.5 --j4 0 --j5 0 --j6 0 --duration 3`。时间是仿真时间中的目标轨迹时长，实际关节稳定可能略晚；`wait_until_idle` 的超时不是运动时长。Python API 可用 `robot.move_joints(joints, duration_s=3)`、`robot.move_p(pose, duration_s=3)`，也可在 `Robot.connect("mujoco", {"motion_duration_s": 3}, robot="piper")` 中设置当前连接的默认时长；共享 GUI 同样支持。
+
 **真机**默认不使用 MuJoCo GUI。为了避免误操作，真机运动或状态命令必须显式写 `--backend real` 和机器人型号：
 
 ```bash
@@ -65,7 +67,7 @@ robot_control --backend real --robot franka_fr3 state
 robot_control --backend real camera --no-extrinsics   # 仅采集本机 D435i，无需连接机械臂
 ```
 
-FR3 真机使用 `FRANKA_ROBOT_IP`（默认 `192.168.1.6`）直连；关节和末端运动默认用 4 秒到位，可通过 `FRANKA_MOVE_DURATION_S` 或真机运动命令的 `--duration` 覆盖（twin 运行时须与其启动时长一致）。CLI 的 FR3 运动命令会立即发送，不再逐次要求输入确认。执行前须确认目标和现场安全；底层仍会检查机器人状态和目标参数。Python API 使用 `Robot.connect("mujoco", robot="franka_fr3")` 或 `Robot.connect("real", robot="franka_fr3")`。FR3 场景必须包含 `fr3_mount`，Piper 场景仍使用 `piper_mount`，参见 `docs/fr3.md`。
+FR3 真机使用 `FRANKA_ROBOT_IP`（默认 `192.168.1.6`）直连；关节和末端运动默认用 4 秒，可通过 `FRANKA_MOVE_DURATION_S` 或每条命令的 `--duration` 覆盖（twin 运行时也支持逐条设置）。Piper 真机仍由 SDK 控制运动速度，**不支持 `--duration`**。CLI 的 FR3 运动命令会立即发送，不再逐次要求输入确认。执行前须确认目标和现场安全；底层仍会检查机器人状态和目标参数。Python API 使用 `Robot.connect("mujoco", robot="franka_fr3")` 或 `Robot.connect("real", robot="franka_fr3")`。FR3 场景必须包含 `fr3_mount`，Piper 场景仍使用 `piper_mount`，参见 `docs/fr3.md`。
 
 ## Piper 真机 twin 镜像
 

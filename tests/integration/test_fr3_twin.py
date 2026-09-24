@@ -49,11 +49,13 @@ def test_fr3_twin_mirrors_feedback_and_routes_real_commands(monkeypatch):
             return RobotState(True, False, JointState(positions.copy(), gripper=0.06),
                               Pose((0.5, 0.0, 0.4)))
 
-        def move_joints(self, joints):
-            commands.append(("move_joints", joints))
+        def move_joints(self, joints, duration_s=None):
+            commands.append(("move_joints", joints, duration_s) if duration_s is not None
+                            else ("move_joints", joints))
 
-        def move_p(self, pose):
-            commands.append(("move_p", pose))
+        def move_p(self, pose, duration_s=None):
+            commands.append(("move_p", pose, duration_s) if duration_s is not None
+                            else ("move_p", pose))
 
         def gripper(self, width, effort=None):
             commands.append(("gripper", width))
@@ -118,6 +120,10 @@ def test_fr3_twin_mirrors_feedback_and_routes_real_commands(monkeypatch):
         accepted = runner.invoke(cli.app, motion)
         assert accepted.exit_code == 0, accepted.output
         assert ("move_joints", [0.0, -0.6, 0.0, -2.0, 0.0, 1.5, 0.4]) in commands
+        timed = runner.invoke(cli.app, motion + ["--duration", "0.08"])
+        assert timed.exit_code == 0, timed.output
+        assert ("move_joints", [0.0, -0.6, 0.0, -2.0, 0.0, 1.5, 0.4], 0.08) in commands
+        assert runner.invoke(cli.app, motion + ["--duration", "0"]).exit_code != 0
         moved_pose = runner.invoke(cli.app, ["--backend", "real", "--robot", "franka_fr3",
                                               "move-p", "--x", "0.5", "--y", "0", "--z", "0.4"])
         assert moved_pose.exit_code == 0, moved_pose.output

@@ -23,6 +23,27 @@ def test_joint_count_and_real_backend_guard():
         JointState(np.zeros(7), np.zeros(6))
 
 
+def test_fr3_simulation_duration_and_override():
+    from robot_control.fr3.mujoco import MujocoBackend
+
+    backend = MujocoBackend()
+    backend.connect()
+    try:
+        assert backend.motion_duration_s == 4.0
+        target = np.array([0.05, -0.6, 0, -2.0, 0, 1.6, 0.7])
+        backend.move_joints(target)
+        assert backend._motion.duration == 4.0
+        initial = backend.data.ctrl[backend._arm_actuators].copy()
+        backend.move_joints(target, duration_s=0.1)
+        backend.step(int(0.05 / backend.model.opt.timestep))
+        assert np.linalg.norm(backend.data.ctrl[backend._arm_actuators] - target) < np.linalg.norm(initial - target)
+        assert backend.state().moving
+        backend.step(int(0.06 / backend.model.opt.timestep) + 1)
+        np.testing.assert_allclose(backend.data.ctrl[backend._arm_actuators], target)
+    finally:
+        backend.disconnect()
+
+
 def test_robot_alias_and_distinct_sockets(monkeypatch):
     monkeypatch.delenv("PIPER_SCENE_SOCKET", raising=False)
     monkeypatch.delenv("FR3_SCENE_SOCKET", raising=False)
@@ -45,6 +66,12 @@ def test_cli_fr3_joint_validation_before_connection():
     extra = runner.invoke(app, common + ["--robot", "piper", "--j7", "0"])
     assert extra.exit_code == 2
     assert "--j7 is only valid" in extra.output
+    piper_real_duration = runner.invoke(app, ["--backend", "real", "--robot", "piper"]
+                                        + common + ["--duration", "4"])
+    assert piper_real_duration.exit_code == 2
+    assert "not supported for Piper real" in piper_real_duration.output
+    with pytest.raises(ValueError, match="does not support motion_duration_s"):
+        Robot.connect("real", {"motion_duration_s": 4}, robot="piper")
 
 
 def test_fr3_gui_macos_reexec_and_scene(monkeypatch, tmp_path):

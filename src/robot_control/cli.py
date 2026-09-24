@@ -8,6 +8,7 @@ import sys
 from typing import Annotated
 import typer
 from .api.robot import Robot
+from .backends.joint_trajectory import positive_duration
 from .api.types import Pose
 from .errors import BackendUnavailableError
 from .scene import SceneClient
@@ -231,27 +232,31 @@ def move_joints(
     j6: float = typer.Option(..., "--j6", help="Joint 6 in radians"),
     j7: float | None = typer.Option(None, "--j7", help="Joint 7, required only for franka_fr3"),
     backend: str | None = None, can_name: str = "can0", robot: str | None = None,
-    duration: float | None = typer.Option(None, "--duration", help="FR3 real motion duration in seconds"),
+    duration: float | None = typer.Option(None, "--duration", help="Motion duration in seconds (not Piper real)"),
     degrees: bool = typer.Option(False, "--degrees", help="Interpret joint positions as degrees")):
     backend, selected = _selection(ctx, backend, robot)
     if selected == "franka_fr3" and j7 is None:
         raise typer.BadParameter("--j7 is required for franka_fr3", param_hint="--j7")
     if selected == "piper" and j7 is not None:
         raise typer.BadParameter("--j7 is only valid for franka_fr3", param_hint="--j7")
-    if duration is not None and not (backend in ("real", "twin") and selected == "franka_fr3"):
-        raise typer.BadParameter("--duration is only supported for FR3 real motion")
+    if duration is not None and (backend in ("real", "twin") and selected == "piper"):
+        raise typer.BadParameter("--duration is not supported for Piper real motion")
+    if duration is not None:
+        try:
+            duration = positive_duration(duration)
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc), param_hint="--duration") from exc
     joints = [j1, j2, j3, j4, j5, j6]
     if j7 is not None:
         joints.append(j7)
     if degrees:
         import math
         joints = [math.radians(value) for value in joints]
-    options = {"motion_duration_s": duration} if duration is not None else {}
-    instance = _robot(backend, can_name, selected, **options)
+    instance = _robot(backend, can_name, selected)
     try:
-        instance.move_joints(joints)
+        instance.move_joints(joints, duration_s=duration)
         if backend == "mujoco":
-            instance.wait_until_idle()
+            instance.wait_until_idle(timeout=max(10.0, duration + 5.0) if duration is not None else 10.0)
         typer.echo(json.dumps({"joints_rad": instance.state().joints.positions.tolist()}, indent=2))
     finally:
         instance.disconnect()
@@ -266,12 +271,16 @@ def move_p(
            qw: float | None = typer.Option(None, "--qw"), qx: float | None = typer.Option(None, "--qx"),
            qy: float | None = typer.Option(None, "--qy"), qz: float | None = typer.Option(None, "--qz"),
            backend: str | None = None, can_name: str = "can0", robot: str | None = None,
-           duration: float | None = typer.Option(None, "--duration", help="FR3 real motion duration in seconds")):
+           duration: float | None = typer.Option(None, "--duration", help="Motion duration in seconds (not Piper real)")):
     backend, robot = _selection(ctx, backend, robot)
-    if duration is not None and not (backend in ("real", "twin") and robot == "franka_fr3"):
-        raise typer.BadParameter("--duration is only supported for FR3 real motion")
-    options = {"motion_duration_s": duration} if duration is not None else {}
-    instance = _robot(backend, can_name, robot, **options)
+    if duration is not None and (backend in ("real", "twin") and robot == "piper"):
+        raise typer.BadParameter("--duration is not supported for Piper real motion")
+    if duration is not None:
+        try:
+            duration = positive_duration(duration)
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc), param_hint="--duration") from exc
+    instance = _robot(backend, can_name, robot)
     try:
         quaternion = (qw, qx, qy, qz)
         if all(value is None for value in quaternion):
@@ -282,9 +291,9 @@ def move_p(
         elif any(value is None for value in quaternion):
             raise typer.BadParameter("provide all four quaternion options or none")
         target = Pose((x, y, z), tuple(float(value) for value in quaternion))
-        instance.move_p(target)
+        instance.move_p(target, duration_s=duration)
         if backend == "mujoco":
-            instance.wait_until_idle()
+            instance.wait_until_idle(timeout=max(10.0, duration + 5.0) if duration is not None else 10.0)
         current = instance.state().pose
         if current is not None:
             typer.echo(json.dumps(_pose_dict(current), indent=2))

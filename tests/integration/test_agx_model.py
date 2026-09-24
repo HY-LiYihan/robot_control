@@ -61,8 +61,9 @@ def test_fk_and_arm_parameters_match_official_urdf(backend):
         np.testing.assert_allclose(backend.model.actuator_ctrlrange[backend.model.actuator(name).id], expected_range)
     # Specifically catch the old asymmetric joint1 limit.
     backend.move_joints([2.5, 0.5, -0.5, 0, 0, 0])
-    assert backend.data.ctrl[backend._arm_actuators[0]] == pytest.approx(2.5)
     assert backend.state().joints.positions[0] == pytest.approx(0)
+    backend.step(int(backend.motion_duration_s / backend.model.opt.timestep) + 1)
+    assert backend.data.ctrl[backend._arm_actuators[0]] == pytest.approx(2.5)
 
 
 def test_arm_meshes_only_reference_new_repository():

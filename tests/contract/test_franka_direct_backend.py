@@ -170,6 +170,15 @@ def test_franka_real_cli_executes_without_confirmation(bindings, monkeypatch):
     gripper = runner.invoke(app, common + ["gripper", "0.04"])
     assert gripper.exit_code == 0, gripper.output
     assert grippers[-1].moves == [(0.04, 0.05)]
+    timed = runner.invoke(app, common + ["move-joints", "--j1", "0", "--j2", "0",
+                                          "--j3", "0", "--j4", "0", "--j5", "0",
+                                          "--j6", "0", "--j7", "0", "--duration", "0.04"])
+    assert timed.exit_code == 0, timed.output
+    assert len(robots[-1].control.commands) == 5
+    timed_pose = runner.invoke(app, common + ["move-p", "--x", "0.5", "--y", "0",
+                                               "--z", "0.4", "--duration", "0.04"])
+    assert timed_pose.exit_code == 0, timed_pose.output
+    assert len(robots[-1].control.commands) == 5
     invalid_gripper = runner.invoke(app, common + ["gripper", "0.09"])
     assert invalid_gripper.exit_code != 0
     assert grippers[-1].moves == []

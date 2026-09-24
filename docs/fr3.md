@@ -14,6 +14,8 @@ FR3 启动时的七轴初始位姿与执行器目标均为 `[0, -0.7854, 0, -2.3
 
 `pos` 必填，单位米；`quat` 是可选的 wxyz 四元数。FR3 的 `move-p` 位姿对应 `fr3_link7`，仿真相机使用模型中的 `d435i_check`。仿真深度是 MuJoCo 渲染深度，不等同于 D435i 物理测量。若有 USB RealSense，`robot_control --backend real camera --no-extrinsics` 仅采集相机，不控制机械臂。FR3 真机通过本地匹配的 `pylibfranka`/`libfranka` 直连 FCI；`robot_control --backend twin --robot franka_fr3` 会镜像真机七轴和夹爪反馈，第二个终端的 `real`/`twin` 命令复用该连接。启动 twin 不会主动移动真机，FR3 真机相机外参尚未支持。
 
+FR3 仿真和真机的关节、末端轨迹默认均为 4 秒；仿真按仿真时间推进轨迹，实际稳定时间可能略晚。`move-joints` 和 `move-p` 可追加 `--duration 6` 指定单条命令的轨迹时长，在 GUI、无窗口共享场景、独立仿真和 twin 中均适用。夹爪不使用该时长参数；Piper 仿真默认 2 秒，Piper 真机保持原有 SDK 控制方式、不支持 `--duration`。
+
 Python 示例：
 
 ```python

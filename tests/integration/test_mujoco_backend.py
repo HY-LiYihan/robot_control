@@ -21,7 +21,7 @@ def test_mujoco_model_loads_and_moves():
         backend.move_joints(target)
         assert backend.state().moving
         np.testing.assert_allclose(backend.data.qpos[backend._arm_qpos], PIPER_INITIAL_JOINTS_RAD)
-        np.testing.assert_allclose(backend.data.ctrl[backend._arm_actuators], target)
+        np.testing.assert_allclose(backend.data.ctrl[backend._arm_actuators], PIPER_INITIAL_JOINTS_RAD)
         backend.step(1)
         assert np.linalg.norm(backend.state().joints.positions) > 0
         assert np.max(np.abs(backend.state().joints.positions - target)) > 0.1
@@ -31,6 +31,27 @@ def test_mujoco_model_loads_and_moves():
         backend.gripper(0.02)
         backend.wait_until_idle()
         assert backend.state().joints.gripper == pytest.approx(0.02, abs=5e-4)
+    finally:
+        backend.disconnect()
+
+
+def test_piper_simulation_duration_and_override():
+    backend = MujocoBackend(wrist_camera=False)
+    backend.connect()
+    try:
+        assert backend.motion_duration_s == 2.0
+        target = np.array([0, 0.5, -0.5, 0, 0, 0])
+        backend.move_joints(target)
+        assert backend._motion.duration == 2.0
+        backend.move_joints(target, duration_s=0.1)
+        backend.step(int(0.05 / backend.model.opt.timestep))
+        midpoint = backend.data.ctrl[backend._arm_actuators].copy()
+        assert np.linalg.norm(midpoint - target) < np.linalg.norm(PIPER_INITIAL_JOINTS_RAD - target)
+        assert backend.state().moving
+        backend.step(int(0.06 / backend.model.opt.timestep) + 1)
+        np.testing.assert_allclose(backend.data.ctrl[backend._arm_actuators], target)
+        with pytest.raises(ValueError, match="duration"):
+            backend.move_joints(target, duration_s=0)
     finally:
         backend.disconnect()
 
@@ -74,7 +95,7 @@ def test_wait_timeout_does_not_force_position():
         backend.move_joints([1., 1., -1., .4, .4, .4])
         with pytest.raises(TimeoutError):
             backend.wait_until_idle(timeout=.002)
-        assert np.max(np.abs(backend.state().joints.positions - backend.data.ctrl[:6])) > .5
+        assert np.max(np.abs(backend.state().joints.positions - [1., 1., -1., .4, .4, .4])) > .5
     finally:
         backend.disconnect()
 

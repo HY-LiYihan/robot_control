@@ -177,11 +177,18 @@ class SceneServer:
             self._respond(conn, {"ok": True, "state": _state_to_dict(state)})
         elif command == "move_p":
             with self.lock:
-                self.backend.move_p(Pose(tuple(payload["position"]), tuple(payload["quaternion"])))
+                pose = Pose(tuple(payload["position"]), tuple(payload["quaternion"]))
+                if "duration_s" in payload:
+                    self.backend.move_p(pose, duration_s=payload["duration_s"])
+                else:
+                    self.backend.move_p(pose)
             self._respond(conn, {"ok": True})
         elif command == "move_joints":
             with self.lock:
-                self.backend.move_joints(payload["joints"])
+                if "duration_s" in payload:
+                    self.backend.move_joints(payload["joints"], duration_s=payload["duration_s"])
+                else:
+                    self.backend.move_joints(payload["joints"])
             self._respond(conn, {"ok": True})
         elif command == "gripper":
             with self.lock:
@@ -252,8 +259,9 @@ class SceneServer:
 class SceneClient:
     """A :class:`RobotBackend` that forwards every call to the shared scene."""
 
-    def __init__(self, socket_path=None, robot: str = "piper"):
+    def __init__(self, socket_path=None, robot: str = "piper", motion_duration_s: float | None = None):
         self.robot = robot
+        self._default_duration_s = motion_duration_s
         self.socket_path = Path(socket_path) if socket_path else default_socket_path(robot)
         self._socket = None
         self._reader = None
@@ -315,13 +323,20 @@ class SceneClient:
         self._send({"cmd": "state"})
         return _state_from_dict(self._receive()["state"])
 
-    def move_joints(self, joints) -> None:
-        self._send({"cmd": "move_joints", "joints": [float(v) for v in joints]})
+    def move_joints(self, joints, duration_s: float | None = None) -> None:
+        payload = {"cmd": "move_joints", "joints": [float(value) for value in joints]}
+        duration_s = self._default_duration_s if duration_s is None else duration_s
+        if duration_s is not None:
+            payload["duration_s"] = duration_s
+        self._send(payload)
         self._receive()
 
-    def move_p(self, pose: Pose) -> None:
-        self._send({"cmd": "move_p", "position": list(pose.position),
-                    "quaternion": list(pose.quaternion)})
+    def move_p(self, pose: Pose, duration_s: float | None = None) -> None:
+        payload = {"cmd": "move_p", "position": list(pose.position), "quaternion": list(pose.quaternion)}
+        duration_s = self._default_duration_s if duration_s is None else duration_s
+        if duration_s is not None:
+            payload["duration_s"] = duration_s
+        self._send(payload)
         self._receive()
 
     def gripper(self, width: float, effort: float | None = None) -> None:
