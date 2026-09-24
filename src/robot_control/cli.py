@@ -257,7 +257,16 @@ def move_joints(
         instance.move_joints(joints, duration_s=duration)
         if backend == "mujoco":
             instance.wait_until_idle(timeout=max(10.0, duration + 5.0) if duration is not None else 10.0)
-        typer.echo(json.dumps({"joints_rad": instance.state().joints.positions.tolist()}, indent=2))
+        observed = instance.state()
+        response = {"joints_rad": observed.joints.positions.tolist()}
+        if backend in ("real", "twin") and selected == "piper":
+            response["target_reached"] = bool(
+                observed.error is None and not observed.moving
+                and max(abs(actual - target) for actual, target
+                        in zip(observed.joints.positions, joints)) <= 0.02
+            )
+            response["error"] = observed.error
+        typer.echo(json.dumps(response, indent=2))
     finally:
         instance.disconnect()
 
@@ -294,9 +303,14 @@ def move_p(
         instance.move_p(target, duration_s=duration)
         if backend == "mujoco":
             instance.wait_until_idle(timeout=max(10.0, duration + 5.0) if duration is not None else 10.0)
-        current = instance.state().pose
+        observed = instance.state()
+        current = observed.pose
         if current is not None:
-            typer.echo(json.dumps(_pose_dict(current), indent=2))
+            response = _pose_dict(current)
+            if backend in ("real", "twin") and robot == "piper":
+                response["target_reached"] = observed.error is None and not observed.moving
+                response["error"] = observed.error
+            typer.echo(json.dumps(response, indent=2))
     finally:
         instance.disconnect()
 
