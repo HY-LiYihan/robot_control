@@ -9,6 +9,7 @@ pytest.importorskip("mujoco")
 from robot_control import Pose
 from robot_control import Robot
 from robot_control.backends.mujoco import MujocoBackend
+from robot_control.config import PIPER_INITIAL_JOINTS_RAD
 from robot_control.errors import IKError
 from robot_control.scene import SceneClient, SceneServer
 
@@ -39,7 +40,7 @@ def test_client_round_trip_joints_gripper_and_pose(scene):
         target = [0.1, 0.5, -0.5, 0.0, 0.0, 0.0]
         client.move_joints(target)
         assert client.state().moving
-        np.testing.assert_array_equal(server.backend.data.qpos[server.backend._arm_qpos], np.zeros(6))
+        np.testing.assert_allclose(server.backend.data.qpos[server.backend._arm_qpos], PIPER_INITIAL_JOINTS_RAD)
         with server.lock:
             server.backend.wait_until_idle()
         assert np.max(np.abs(client.state().joints.positions - target)) < 0.02

@@ -8,6 +8,7 @@ import xml.etree.ElementTree as ET
 import math
 import numpy as np
 from ..api.types import JointState, Pose, RobotState
+from ..config import PIPER_INITIAL_JOINTS_RAD
 from ..errors import BackendUnavailableError, IKError, NotConnectedError
 from ..kinematics.ik import PinocchioIK
 from ..sensors.extrinsics import (ORDINARY_LINK6_FROM_V100_LINK6,
@@ -106,6 +107,11 @@ class MujocoBackend:
         self.ik.upper = np.minimum(self.ik.upper, upper)
         if np.any(self.ik.lower >= self.ik.upper):
             raise ValueError("Pinocchio and MuJoCo joint limits do not overlap")
+        initial_joints = np.asarray(PIPER_INITIAL_JOINTS_RAD, dtype=float)
+        if initial_joints.shape != (6,) or np.any(initial_joints < lower) or np.any(initial_joints > upper):
+            raise ValueError("Piper initial joints are outside the MuJoCo joint limits")
+        self.data.qpos[self._arm_qpos] = initial_joints
+        self.data.ctrl[self._arm_actuators] = initial_joints
         # Check custom MJCF/URDF pairs on scratch data, never the live scene.
         scratch = mujoco.MjData(self.model)
         for q in (np.zeros(6), np.array([.2, .6, -1., .2, -.3, .4])):

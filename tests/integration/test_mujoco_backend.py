@@ -4,6 +4,7 @@ import pytest
 mujoco = pytest.importorskip("mujoco")
 
 from robot_control.backends.mujoco import MujocoBackend
+from robot_control.config import PIPER_INITIAL_JOINTS_RAD
 from robot_control import Pose
 from robot_control.errors import IKError
 
@@ -19,7 +20,7 @@ def test_mujoco_model_loads_and_moves():
         target = [0, 0.5, -0.5, 0, 0, 0]
         backend.move_joints(target)
         assert backend.state().moving
-        np.testing.assert_array_equal(backend.data.qpos[backend._arm_qpos], np.zeros(6))
+        np.testing.assert_allclose(backend.data.qpos[backend._arm_qpos], PIPER_INITIAL_JOINTS_RAD)
         np.testing.assert_allclose(backend.data.ctrl[backend._arm_actuators], target)
         backend.step(1)
         assert np.linalg.norm(backend.state().joints.positions) > 0

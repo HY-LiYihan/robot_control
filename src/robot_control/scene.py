@@ -30,7 +30,12 @@ def default_socket_path(robot: str = "piper") -> Path:
     return Path(override) if override else Path(tempfile.gettempdir()) / "piper_scene.sock"
 
 
-def twin_socket_path() -> Path:
+def twin_socket_path(robot: str = "piper") -> Path:
+    if robot == "franka_fr3":
+        override = __import__("os").environ.get("FR3_TWIN_SOCKET")
+        return Path(override) if override else Path(tempfile.gettempdir()) / "fr3_twin.sock"
+    if robot != "piper":
+        raise ValueError(f"unknown robot: {robot}")
     override = __import__("os").environ.get("PIPER_TWIN_SOCKET")
     return Path(override) if override else Path(tempfile.gettempdir()) / "piper_twin.sock"
 
@@ -161,6 +166,10 @@ class SceneServer:
             path = getattr(self.backend, "scene_path", None)
             self._respond(conn, {"ok": True, "robot": self.robot, "mode": self.mode,
                                  "can_name": getattr(self.backend, "can_name", None),
+                                 "robot_ip": getattr(self.backend, "robot_ip", None),
+                                 "motion_duration_s": getattr(self.backend, "motion_duration_s", None),
+                                 "gripper_speed_m_s": getattr(self.backend, "gripper_speed_m_s", None),
+                                 "rt_priority": getattr(self.backend, "rt_priority", None),
                                  "scene_path": str(path) if path is not None else None})
         elif command == "state":
             with self.lock:
@@ -184,7 +193,7 @@ class SceneServer:
             self._respond(conn, {"ok": True})
         elif command == "camera":
             if self.mode == "twin":
-                raise BackendUnavailableError("Twin camera capture uses the real RealSense; use `robot_control --backend twin --robot piper camera`")
+                raise BackendUnavailableError("Twin camera capture uses the real RealSense; use `robot_control --backend real camera --no-extrinsics`")
             self._serve_camera(conn, payload)
         else:
             raise ValueError(f"unknown scene command: {command}")

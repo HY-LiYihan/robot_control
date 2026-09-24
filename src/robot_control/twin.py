@@ -13,45 +13,59 @@ from .errors import BackendUnavailableError
 from .scene import SceneClient, SceneServer, twin_socket_path
 
 
-def mirror_feedback(real: RealBackend, simulation: MujocoBackend) -> None:
+def mirror_feedback(real, simulation, robot: str = "piper") -> None:
     import mujoco
 
     state = real.state()
     joints = state.joints.positions
-    if joints.shape != (6,) or not np.isfinite(joints).all():
-        raise BackendUnavailableError("Piper twin requires six finite measured joint angles")
+    count = 7 if robot == "franka_fr3" else 6
+    if joints.shape != (count,) or not np.isfinite(joints).all():
+        raise BackendUnavailableError(f"{robot} twin requires {count} finite measured joint angles")
     simulation.data.qpos[simulation._arm_qpos] = joints
-    width = real.gripper_width()
-    if width is not None:
+    width = state.joints.gripper if robot == "franka_fr3" else real.gripper_width()
+    if width is not None and np.isfinite(width):
         opening = np.clip(width, 0.0, simulation._gripper_max_width) / 2
-        simulation.data.qpos[simulation._finger_qpos] = (opening, -opening)
+        simulation.data.qpos[simulation._finger_qpos] = ((opening, opening) if robot == "franka_fr3"
+                                                       else (opening, -opening))
     simulation.data.qvel[:] = 0
     mujoco.mj_forward(simulation.model, simulation.data)
 
 
 def run_host(duration: float = 0.0, *, scene: Path | None = None,
-             can_name: str = "can0", gui: bool = True) -> None:
-    """Display measured Piper joints; all control requests go to RealBackend."""
-    existing = SceneClient(socket_path=twin_socket_path())
+             can_name: str = "can0", gui: bool = True, robot: str = "piper") -> None:
+    """Mirror measured real joints in MuJoCo; serve control using the real backend."""
+    if robot not in ("piper", "franka_fr3"):
+        raise ValueError(f"unknown robot: {robot}")
+    socket_path = twin_socket_path(robot)
+    existing = SceneClient(socket_path=socket_path, robot=robot)
     try:
         existing.connect()
     except BackendUnavailableError:
         pass
     else:
-        raise BackendUnavailableError("Piper twin is already running")
+        raise BackendUnavailableError(f"{robot} twin is already running")
     finally:
         existing.disconnect()
 
-    simulation = MujocoBackend(scene=scene)
+    if robot == "franka_fr3":
+        from .fr3.mujoco import MujocoBackend as FR3MujocoBackend
+        from .backends.franka_direct import FrankaDirectBackend
+        simulation = FR3MujocoBackend(scene=scene)
+        real = FrankaDirectBackend()
+    else:
+        simulation = MujocoBackend(scene=scene)
+        real = RealBackend(can_name=can_name)
     simulation.connect()
-    real = RealBackend(can_name=can_name)
-    server = SceneServer(real, socket_path=twin_socket_path(), mode="twin")
+    server = SceneServer(real, socket_path=socket_path, robot=robot, mode="twin")
     try:
-        real.connect(piper_init=False)
+        if robot == "piper":
+            real.connect(piper_init=False)
+        else:
+            real.connect()
         deadline = time.monotonic() + 5
         while True:
             try:
-                mirror_feedback(real, simulation)
+                mirror_feedback(real, simulation, robot=robot)
                 break
             except BackendUnavailableError:
                 if time.monotonic() >= deadline:
@@ -72,11 +86,11 @@ def run_host(duration: float = 0.0, *, scene: Path | None = None,
                 if viewer is not None:
                     with viewer.lock():
                         with server.lock:
-                            mirror_feedback(real, simulation)
+                            mirror_feedback(real, simulation, robot=robot)
                     viewer.sync()
                 else:
                     with server.lock:
-                        mirror_feedback(real, simulation)
+                        mirror_feedback(real, simulation, robot=robot)
                 time.sleep(max(0, 1 / 30 - (time.monotonic() - tick)))
     except KeyboardInterrupt:
         pass
@@ -88,12 +102,13 @@ def run_host(duration: float = 0.0, *, scene: Path | None = None,
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Mirror Piper real-robot feedback in a MuJoCo viewer")
+    parser = argparse.ArgumentParser(description="Mirror real-robot feedback in a MuJoCo viewer")
     parser.add_argument("--scene", type=Path)
     parser.add_argument("--can-name", default="can0")
     parser.add_argument("--duration", type=float, default=0.0)
+    parser.add_argument("--robot", choices=("piper", "franka_fr3"), default="piper")
     args = parser.parse_args()
-    run_host(args.duration, scene=args.scene, can_name=args.can_name)
+    run_host(args.duration, scene=args.scene, can_name=args.can_name, robot=args.robot)
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ import pytest
 
 from robot_control.backends.piper_model import ASSET_ROOT
 from robot_control.backends.real import RealBackend
+from robot_control.config import PIPER_INITIAL_JOINTS_RAD
 from robot_control.errors import BackendUnavailableError
 from robot_control.kinematics.ik import PinocchioIK
 
@@ -65,6 +66,19 @@ def test_passive_real_connection_and_gripper_feedback(monkeypatch):
         def DisconnectPort(self):
             calls.append(("disconnect",))
 
+        def MotionCtrl_2(self, *values):
+            calls.append(("motion_ctrl_2", values))
+
+        def JointCtrl(self, *values):
+            calls.append(("joint_ctrl", values))
+
+        def GetArmJointMsgs(self):
+            values = np.rint(np.rad2deg(PIPER_INITIAL_JOINTS_RAD) * 1000).astype(int)
+            feedback = SimpleNamespace(**{
+                f"joint_{index}": int(value) for index, value in enumerate(values, start=1)
+            })
+            return SimpleNamespace(time_stamp=time.time(), joint_state=feedback)
+
         def GetArmGripperMsgs(self):
             return SimpleNamespace(time_stamp=time.time(),
                                    gripper_state=SimpleNamespace(grippers_angle=40000))
@@ -74,6 +88,8 @@ def test_passive_real_connection_and_gripper_feedback(monkeypatch):
     backend.connect(piper_init=False)
     try:
         assert calls[:2] == [("create", "can1"), ("connect", False)]
+        assert calls[2][0] == "motion_ctrl_2"
+        assert calls[3][0] == "joint_ctrl"
         assert backend.gripper_width() == pytest.approx(0.04)
     finally:
         backend.disconnect()

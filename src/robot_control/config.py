@@ -1,4 +1,9 @@
 from dataclasses import dataclass
+import math
+
+
+PIPER_INITIAL_JOINTS_DEG = (0.0, 30.0, -45.0, 0.0, 60.0, 0.0)
+PIPER_INITIAL_JOINTS_RAD = tuple(math.radians(value) for value in PIPER_INITIAL_JOINTS_DEG)
 
 
 @dataclass

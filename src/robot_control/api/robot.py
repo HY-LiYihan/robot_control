@@ -40,20 +40,30 @@ class Robot:
             raise ValueError("scene is only supported by the MuJoCo backend")
         if backend in ("real", "twin"):
             socket_path = config.pop("twin_socket_path", None)
-            twin = SceneClient(socket_path=socket_path or twin_socket_path(), robot="piper")
+            twin = SceneClient(socket_path=socket_path or twin_socket_path(robot), robot=robot)
             try:
                 twin.connect()
             except BackendUnavailableError:
                 twin.disconnect()
                 if backend == "twin":
-                    raise BackendUnavailableError("Piper twin is not running; start `robot_control --backend twin` first")
+                    raise BackendUnavailableError(
+                        f"{robot} twin is not running; start `robot_control --backend twin --robot {robot}` first")
             else:
                 try:
                     info = twin.scene_info()
-                    if info.get("mode") != "twin" or info.get("robot") != "piper":
-                        raise BackendUnavailableError("Twin socket does not belong to a Piper real-robot twin")
-                    if info.get("can_name") != config.get("can_name", "can0"):
+                    if info.get("mode") != "twin" or info.get("robot") != robot:
+                        raise BackendUnavailableError(f"Twin socket does not belong to a {robot} real-robot twin")
+                    if robot == "piper" and info.get("can_name") != config.get("can_name", "can0"):
                         raise ValueError("Twin is connected to a different CAN interface")
+                    if robot == "franka_fr3":
+                        from ..backends.franka_direct import FrankaDirectBackend
+                        requested = FrankaDirectBackend(**config)
+                        if requested.robot_ip != info.get("robot_ip"):
+                            raise ValueError("Twin is connected to a different FR3 IP address")
+                        for key in ("robot_ip", "motion_duration_s", "gripper_speed_m_s", "rt_priority"):
+                            if key in config and getattr(requested, key) != info.get(key):
+                                raise ValueError(f"Twin is configured with a different {key}; restart the twin with matching settings")
+                            setattr(twin, key, info[key])
                 except Exception:
                     twin.disconnect()
                     raise
@@ -101,7 +111,11 @@ class Robot:
                     raise
             return cls._attached(scene, backend, robot)
         elif backend == "real":
-            impl = RealBackend(**config)
+            if robot == "franka_fr3":
+                from ..backends.franka_direct import FrankaDirectBackend
+                impl = FrankaDirectBackend(**config)
+            else:
+                impl = RealBackend(**config)
         else:
             raise ValueError(f"unknown backend: {backend}")
         impl.connect()

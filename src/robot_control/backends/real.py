@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 import numpy as np
 from ..api.types import JointState, Pose, RobotState
+from ..config import PIPER_INITIAL_JOINTS_RAD
 from ..errors import BackendUnavailableError, NotConnectedError
 from ..kinematics.ik import PinocchioIK
 from .piper_model import ASSET_ROOT
@@ -13,8 +14,17 @@ from .piper_model import ASSET_ROOT
 class RealBackend:
     """Thin adapter around the pinned piper_sdk; imports the SDK only on connect."""
 
-    def __init__(self, can_name: str = "can0", judge_flag: bool = False, **kwargs):
+    def __init__(self, can_name: str = "can0", judge_flag: bool = False,
+                 initial_motion_speed: int = 30, initial_motion_timeout_s: float = 15.0,
+                 auto_initialize: bool = True, **kwargs):
         self.can_name, self.judge_flag, self.kwargs = can_name, judge_flag, kwargs
+        self.initial_motion_speed = int(initial_motion_speed)
+        self.initial_motion_timeout_s = float(initial_motion_timeout_s)
+        self.auto_initialize = bool(auto_initialize)
+        if not 0 <= self.initial_motion_speed <= 100:
+            raise ValueError("initial_motion_speed must be between 0 and 100")
+        if not np.isfinite(self.initial_motion_timeout_s) or self.initial_motion_timeout_s <= 0:
+            raise ValueError("initial_motion_timeout_s must be positive and finite")
         self._sdk = None
         self._fk = None
         self._connected = False
@@ -37,6 +47,31 @@ class RealBackend:
                                      can_auto_init=True, **self.kwargs)
         self._sdk.ConnectPort(piper_init=piper_init)
         self._connected = True
+        if self.auto_initialize:
+            try:
+                self._move_to_initial_position()
+            except Exception:
+                self.disconnect()
+                raise
+
+    def _move_to_initial_position(self) -> None:
+        target = np.asarray(PIPER_INITIAL_JOINTS_RAD, dtype=float)
+        target_sdk = np.rint(np.rad2deg(target) * 1000).astype(int)
+        mode = getattr(self._sdk, "MotionCtrl_2", None)
+        command = getattr(self._sdk, "JointCtrl", None)
+        if mode is None or command is None:
+            raise BackendUnavailableError("piper_sdk does not provide joint initialization commands")
+        mode(0x01, 0x01, self.initial_motion_speed, 0x00)
+        command(*target_sdk.tolist())
+        deadline = time.monotonic() + self.initial_motion_timeout_s
+        while time.monotonic() < deadline:
+            state = self.state()
+            if np.max(np.abs(state.joints.positions - target)) <= 0.02:
+                return
+            time.sleep(0.05)
+        raise BackendUnavailableError(
+            f"Piper did not reach the initial position within {self.initial_motion_timeout_s:g} seconds"
+        )
 
     def gripper_width(self) -> float | None:
         self._require()

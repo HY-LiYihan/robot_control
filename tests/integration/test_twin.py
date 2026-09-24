@@ -188,14 +188,15 @@ def test_twin_gui_only_syncs_measured_configuration(monkeypatch):
         assert timestamp == 0
 
 
-def test_twin_cli_requires_explicit_robot_for_commands_and_rejects_fr3(monkeypatch):
+def test_twin_cli_requires_explicit_robot_for_commands_and_launches_fr3(monkeypatch):
     runner = CliRunner()
     calls = []
     monkeypatch.setattr(cli, "_run_twin_host", lambda *args, **kwargs: calls.append((args, kwargs)))
     assert runner.invoke(cli.app, ["--backend", "twin"]).exit_code == 0
     assert calls == [((0.0,), {"scene": None})]
     assert runner.invoke(cli.app, ["--backend", "twin", "state"]).exit_code == 2
-    assert runner.invoke(cli.app, ["--backend", "twin", "--robot", "franka_fr3"]).exit_code == 2
+    assert runner.invoke(cli.app, ["--backend", "twin", "--robot", "franka_fr3"]).exit_code == 0
+    assert calls[-1] == ((0.0,), {"scene": None, "robot": "franka_fr3"})
     assert runner.invoke(cli.app, ["--backend", "twin", "--robot", "piper", "run", "--steps", "1"]).exit_code == 2
     result = runner.invoke(cli.app, ["--backend", "twin", "--robot", "piper", "run", "--gui",
                                      "--duration", "1", "--can-name", "can1"])

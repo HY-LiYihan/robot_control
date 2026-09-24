@@ -25,7 +25,7 @@ python -m pip install -e ".[mujoco,dev]"
 pip install -e ".[real,camera]"  # 需要真机/RealSense 时
 ```
 
-FR3 的 `vendor` 模型目录按源码路径读取，使用上述**可编辑安装**。`[real]` 仅用于 Piper 真机；FR3 真机运动控制未实现，也未进行硬件测试。Piper twin 同时需要 `[mujoco,real]`，采集真相机还需 `[camera]`。真相机取帧可独立使用 `robot_control --backend real camera --no-extrinsics`。
+FR3 的 `vendor` 模型目录按源码路径读取，使用上述**可编辑安装**。FR3 真机通过本机匹配的 `pylibfranka`/`libfranka` 直连 FCI；这些依赖不包含在仓库中。Piper 和 FR3 twin 同时需要 `[mujoco,real]`，采集真相机还需 `[camera]`。真相机取帧可独立使用 `robot_control --backend real camera --no-extrinsics`。
 
 ## 统一命令与自动选择
 
@@ -56,15 +56,16 @@ robot_control stop
 
 控制命令的 `--robot` 选择顺序为：显式指定 > 当前唯一运行的 MuJoCo 场景 > 无场景时默认 Piper（独立仿真）。Piper 和 FR3 场景同时运行时，必须显式指定 `--robot`，例如 `robot_control --robot franka_fr3 state`。两种机器人的 GUI 使用不同 socket，客户端不会误连另一种机器人。FR3 `move-joints` 必须传 `--j7`，Piper 不可传。
 
-**真机**默认不使用 MuJoCo GUI。为了避免误操作，真机运动或状态命令必须显式写 `--backend real --robot piper`：
+**真机**默认不使用 MuJoCo GUI。为了避免误操作，真机运动或状态命令必须显式写 `--backend real` 和机器人型号：
 
 ```bash
 robot_control --backend real --robot piper state
 robot_control --backend real --robot piper gripper 0.02
+robot_control --backend real --robot franka_fr3 state
 robot_control --backend real camera --no-extrinsics   # 仅采集本机 D435i，无需连接机械臂
 ```
 
-FR3 真机运动控制 (`--backend real --robot franka_fr3`) 会明确报错。Python API 使用 `Robot.connect("mujoco", robot="franka_fr3")` 或 `Robot.connect(...)`。FR3 场景必须包含 `fr3_mount`，Piper 场景仍使用 `piper_mount`，参见 `docs/fr3.md`。
+FR3 真机使用 `FRANKA_ROBOT_IP`（默认 `192.168.1.6`）直连；CLI 的 FR3 运动命令需要文字确认。Python API 使用 `Robot.connect("mujoco", robot="franka_fr3")` 或 `Robot.connect("real", robot="franka_fr3")`。FR3 场景必须包含 `fr3_mount`，Piper 场景仍使用 `piper_mount`，参见 `docs/fr3.md`。
 
 ## Piper 真机 twin 镜像
 
@@ -85,7 +86,32 @@ robot_control --backend real --robot piper pose
 robot_control --backend twin --robot piper state
 ```
 
-只要 twin GUI 在运行，同机 `--backend real` 会自动通过仅本机可访问的 twin socket 复用它的真机连接；`--backend twin` 的运动和状态命令必须有运行中的 twin，绝不回退为仿真控制。如果使用 `can1`，第二终端的命令也要加 `--can-name can1`（放在子命令之后）。Python API 的 `Robot.connect("twin")` 同样复用该真机连接。窗口只同步真机测得的六轴关节角与可用的夹爪开口：不执行 MuJoCo 物理步进，不将窗口中的操作或仿真目标发送到真机。`camera` 仍读取**真机** RealSense，相机命令还需安装 `[camera]`。**注意：使用 `move-joints`、`gripper` 等控制命令会真实驱动机械臂；先检查现场安全。** 关闭窗口会断开 twin 的真机连接。该模式目前仅支持 Piper，尚未经过真实硬件验证。
+只要 twin GUI 在运行，同机 `--backend real` 会自动通过仅本机可访问的 twin socket 复用它的真机连接；`--backend twin` 的运动和状态命令必须有运行中的 twin，绝不回退为仿真控制。如果使用 `can1`，第二终端的命令也要加 `--can-name can1`（放在子命令之后）。Python API 的 `Robot.connect("twin")` 同样复用该真机连接。窗口只同步真机测得的六轴关节角与可用的夹爪开口：不执行 MuJoCo 物理步进，不将窗口中的操作或仿真目标发送到真机。`camera` 仍读取**真机** RealSense，相机命令还需安装 `[camera]`。**注意：使用 `move-joints`、`gripper` 等控制命令会真实驱动机械臂；先检查现场安全。** 关闭窗口会断开 twin 的真机连接。Piper twin 尚未经过真实硬件验证。
+
+## FR3 真机 twin 镜像
+
+第一个终端启动 FR3 twin；它连接一次真机，并用 MuJoCo GUI 镜像七轴和夹爪反馈：
+
+```bash
+export FRANKA_ROBOT_IP=192.168.1.6
+robot_control --backend twin --robot franka_fr3
+```
+
+无图形桌面时可以使用：
+
+```bash
+robot_control --backend twin --robot franka_fr3 --no-gui
+```
+
+第二个终端使用同一个虚拟环境执行命令；控制仍然发送给 FR3 真机：
+
+```bash
+export FRANKA_ROBOT_IP=192.168.1.6
+robot_control --backend real --robot franka_fr3 state
+robot_control --backend real --robot franka_fr3 pose
+```
+
+FR3 twin 默认使用本机 `/tmp/fr3_twin.sock`，也可以通过 `FR3_TWIN_SOCKET` 修改。启动 twin 不会主动移动机械臂；MuJoCo 只显示真机状态，不推进仿真物理。FR3 真机相机外参尚未实现，独立采集使用 `robot_control --backend real camera --no-extrinsics`。详细 Ubuntu 部署步骤见 `docs/hardware-setup.md`。
 
 ## 使用
 
