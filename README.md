@@ -113,7 +113,7 @@ robot_control --backend real --robot franka_fr3 state
 robot_control --backend real --robot franka_fr3 pose
 ```
 
-FR3 twin 默认使用本机 `/tmp/fr3_twin.sock`，也可以通过 `FR3_TWIN_SOCKET` 修改。启动 twin 不会主动移动机械臂；MuJoCo 只显示真机状态，不推进仿真物理。FR3 真机相机外参尚未实现，独立采集使用 `robot_control --backend real camera --no-extrinsics`。详细 Ubuntu 部署步骤见 `docs/hardware-setup.md`。
+FR3 twin 默认使用本机 `/tmp/fr3_twin.sock`，也可以通过 `FR3_TWIN_SOCKET` 修改。启动 twin 不会主动移动机械臂；MuJoCo 只显示真机状态，不推进仿真物理。`robot_control --backend real --robot franka_fr3 camera` 会采集真机 D435i RGB-D，并根据七轴反馈及模型自动输出相对于 `fr3_link0` 的外参；独立采集、不连接机械臂时使用 `robot_control --backend real camera --no-extrinsics`。详细 Ubuntu 部署步骤见 `docs/hardware-setup.md`。
 
 ## 使用
 
@@ -134,7 +134,7 @@ robot.stop()
 robot.disconnect()
 ```
 
-`Robot.camera()` 在独立仿真或共享 MuJoCo 场景中读取仿真相机；在 Piper `real` / `twin` 中读取真机 RealSense，并在有同步关节反馈时提供基座外参。只采真相机、完全不连接机械臂时，可用 `robot_control --backend real camera --no-extrinsics`，或在 Python 中调用 `CameraService("real", include_extrinsics=False).capture()`（从 `robot_control.sensors.service` 导入）。真机控制及包含外参的真机相机命令仍须显式指定 `--backend real --robot piper`；FR3 真机暂不可用。
+`Robot.camera()` 在独立仿真或共享 MuJoCo 场景中读取仿真相机；在 Piper 或 FR3 的 `real` / `twin` 中读取真机 RealSense，并在有同步关节反馈时提供基座外参。只采真相机、完全不连接机械臂时，可用 `robot_control --backend real camera --no-extrinsics`，或在 Python 中调用 `CameraService("real", include_extrinsics=False).capture()`（从 `robot_control.sensors.service` 导入）。真机控制及包含外参的真机相机命令仍须显式指定 `--backend real --robot piper` 或 `--backend real --robot franka_fr3`。
 
 ## Piper 场景与坐标细节
 
@@ -202,8 +202,9 @@ robot_control camera \
 row-major `rotation_row_major` describe `T_base_color_optical`: points in
 `d435i_color_optical_frame` are transformed into `base_link` for Piper or
 `fr3_link0` for FR3. On Piper real hardware, the transform is computed from
-joint feedback and the shared URDF. Use `--no-extrinsics` for a standalone
-RealSense capture without a connected Piper arm.
+joint feedback and the shared URDF. On FR3 real/twin hardware, the transform
+uses measured joints and the FR3 URDF camera mount. Use `--no-extrinsics` for a
+standalone RealSense capture without a connected arm.
 
 关节命令使用弧度，并采用选项形式以支持负数：
 

@@ -1,16 +1,18 @@
 import numpy as np
 import pytest
+import time
 from typer.testing import CliRunner
 from pathlib import Path
 from uuid import uuid4
 
 from robot_control import Robot
-from robot_control.api.types import JointState
+from robot_control.api.types import JointState, Pose, RobotState
 from robot_control import cli
 from robot_control.cli import app
 from robot_control.errors import BackendUnavailableError
 from robot_control.scene import SceneClient, SceneServer, default_socket_path
 from robot_control.fr3.scene_builder import validate_scene
+from robot_control.sensors.extrinsics import fr3_link7_to_color_optical, pose_matrix, rpy_rotation
 
 
 runner = CliRunner()
@@ -148,4 +150,77 @@ def test_fr3_mujoco_and_shared_scene():
             robot.disconnect()
     finally:
         server.stop()
+        backend.disconnect()
+
+
+def test_fr3_camera_mount_and_urdf_extrinsics_match(monkeypatch):
+    mujoco = pytest.importorskip("mujoco")
+    pytest.importorskip("pinocchio")
+    from robot_control.fr3.mujoco import MujocoBackend
+    from robot_control.sensors import service
+    from robot_control.sensors.frame import CameraIntrinsics, RGBDFrame
+
+    class Camera:
+        def __init__(self, **kwargs):
+            pass
+
+        def connect(self):
+            pass
+
+        def read(self):
+            return RGBDFrame(np.zeros((2, 2, 3), dtype=np.uint8),
+                             np.zeros((2, 2), dtype=np.uint16), time.time(),
+                             "d435i_color_optical_frame", CameraIntrinsics(2, 2, 1, 1, 1, 1), .001)
+
+        def disconnect(self):
+            pass
+
+    class Arm:
+        def __init__(self, joints):
+            self.joints = joints
+
+        def state(self):
+            return RobotState(True, False, JointState(self.joints), Pose((0, 0, 0)))
+
+    monkeypatch.setattr(service, "RealSenseCamera", Camera)
+
+    backend = MujocoBackend()
+    backend.connect()
+    try:
+        camera_body = backend.model.body("d435i").id
+        mount = backend.model.body("fr3_d435i_mount").id
+        base = backend.model.body("fr3_link0").id
+        optical = backend.model.site("d435i_color_optical_frame").id
+        for joints in ([0, -0.7854, 0, -2.3562, 0, 1.5708, 0.7854],
+                       [.1, -.2, .15, -1.4, .2, 1.5, -.7]):
+            backend.data.qpos[backend._arm_qpos] = joints
+            mujoco.mj_forward(backend.model, backend.data)
+            mount_rotation = backend.data.xmat[mount].reshape(3, 3)
+            camera_rotation = backend.data.xmat[camera_body].reshape(3, 3)
+            np.testing.assert_allclose(mount_rotation.T @ camera_rotation,
+                                       rpy_rotation(0, -2.00712863979, 0) @ rpy_rotation(np.pi, 0, 0), atol=1e-6)
+            physical_center = (backend.data.xpos[camera_body]
+                               + camera_rotation @ [0, -.0175, 0])
+            original_center = (backend.data.xpos[mount]
+                               + mount_rotation @ [.0635832488467, .04912 - .0175, .0378225720135])
+            np.testing.assert_allclose(physical_center, original_center, atol=1e-8)
+            base_transform = np.eye(4)
+            base_transform[:3, :3] = backend.data.xmat[base].reshape(3, 3)
+            base_transform[:3, 3] = backend.data.xpos[base]
+            optical_transform = np.eye(4)
+            optical_transform[:3, :3] = backend.data.site_xmat[optical].reshape(3, 3)
+            optical_transform[:3, 3] = backend.data.site_xpos[optical]
+            from_urdf = pose_matrix(backend.ik.forward(joints)) @ fr3_link7_to_color_optical()
+            np.testing.assert_allclose(np.linalg.inv(base_transform) @ optical_transform,
+                                       from_urdf, atol=2e-6)
+            for backend_name in ("real", "twin"):
+                frame = service.CameraService(backend_name, "franka_fr3", Arm(joints),
+                                              width=2, height=2).capture()
+                calculated = np.eye(4)
+                calculated[:3, :3] = np.asarray(frame.extrinsics.rotation).reshape(3, 3)
+                calculated[:3, 3] = frame.extrinsics.translation
+                assert frame.extrinsics.reference_frame == "fr3_link0"
+                np.testing.assert_allclose(calculated, np.linalg.inv(base_transform) @ optical_transform,
+                                           atol=2e-6)
+    finally:
         backend.disconnect()

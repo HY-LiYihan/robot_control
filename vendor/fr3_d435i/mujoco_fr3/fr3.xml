@@ -155,7 +155,7 @@
                         <geom name="fr3_hand_visual_4" type="mesh" mesh="fr3_hand_4" material="off_white" class="visual" />
                         <body name="fr3_d435i_mount" pos="0 0 0">
                           <geom name="fr3_d435i_mount_visual" type="mesh" mesh="fr3_d435i_mount" material="d435i_mount_gray" contype="0" conaffinity="0" />
-                          <body name="d435i" pos="0.0635832488467 0.04912 0.0378225720135" quat="0.537299608347 0 -0.843391445813 0">
+                          <body name="d435i" pos="0.0635832488467 0.01412 0.0378225720135" quat="0 0.537299608347 0 0.843391445813">
                             <inertial pos="0 0 0" mass="0.07" diaginertia="0.00005 0.00005 0.00005" />
                             <geom mesh="d435i_0" material="rs_IR_Lens" class="visual" name="rs_visual_d435i_0" pos="0.0043 -0.0175 0" quat="0.5 0.5 0.5 0.5" mass="0" />
                             <geom mesh="d435i_1" material="rs_IR_Emitter_Lens" class="visual" name="rs_visual_d435i_1" pos="0.0043 -0.0175 0" quat="0.5 0.5 0.5 0.5" mass="0" />

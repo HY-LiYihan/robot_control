@@ -8,7 +8,7 @@ from typer.testing import CliRunner
 import pytest
 
 from robot_control import cli
-from robot_control.api.types import Pose
+from robot_control.api.types import JointState, Pose, RobotState
 from robot_control.cli import app
 from robot_control.errors import BackendUnavailableError
 from robot_control.scene import SceneClient, SceneServer
@@ -71,6 +71,45 @@ def test_real_camera_outputs_base_extrinsics_and_camera_only_mode(monkeypatch, t
     missing_arm = runner.invoke(app, ["--backend", "real", "camera", *output])
     assert missing_arm.exit_code == 2
     assert "--robot piper" in missing_arm.output
+
+
+def test_fr3_real_camera_cli_outputs_extrinsics(monkeypatch, tmp_path):
+    pytest.importorskip("pinocchio")
+
+    class Camera:
+        def __init__(self, **kwargs):
+            pass
+
+        def connect(self):
+            pass
+
+        def read(self):
+            return RGBDFrame(np.zeros((2, 2, 3), dtype=np.uint8),
+                             np.ones((2, 2), dtype=np.uint16), time.time(),
+                             "d435i_color_optical_frame", CameraIntrinsics(2, 2, 1, 1, 1, 1), .001)
+
+        def disconnect(self):
+            pass
+
+    class Robot:
+        def camera(self):
+            return service.CameraService("real", "franka_fr3", self).capture()
+
+        def state(self):
+            return RobotState(True, False, JointState([0, -.7854, 0, -2.3562, 0, 1.5708, .7854]),
+                              Pose((0, 0, 0)))
+
+        def disconnect(self):
+            pass
+
+    monkeypatch.setattr(service, "RealSenseCamera", Camera)
+    monkeypatch.setattr(cli, "_robot", lambda *args: Robot())
+    output = ["--rgb-out", str(tmp_path / "rgb.png"), "--depth-out", str(tmp_path / "depth.npy")]
+    result = runner.invoke(app, ["--backend", "real", "--robot", "franka_fr3", "camera", *output])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["extrinsics"]["reference_frame"] == "fr3_link0"
+    assert data["extrinsics"]["camera_frame"] == "d435i_color_optical_frame"
 
 
 def test_root_launches_gui_for_selected_robot(monkeypatch):

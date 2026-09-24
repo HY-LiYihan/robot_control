@@ -801,7 +801,7 @@
   <joint name="d435i_mount_joint" type="fixed">
     <parent link="fr3_d435i_mount" />
     <child link="d435i_link" />
-    <origin xyz="0.0635832488467 0.04912 0.0378225720135" rpy="0 -2.00712863979 0" />
+    <origin xyz="0.0635832488467 0.01412 0.0378225720135" rpy="3.141592653589793 -2.00712863979 0" />
   </joint>
   <link name="d435i_color_frame" />
   <joint name="d435i_color_frame_joint" type="fixed">

@@ -53,7 +53,7 @@ The default `Robot.connect("mujoco")` remains the six-joint Piper. Use `Robot.co
 
 # Camera access
 
-`Robot.camera(width=1280, height=720)` returns an `RGBDFrame` for either a standalone or shared MuJoCo scene, or for the Piper `real` / `twin` backend. The frame contains RGB, depth, intrinsics, and camera-to-base extrinsics; real-arm extrinsics require synchronized arm feedback. Connect with `Robot.connect(...)`, capture, then call `robot.disconnect()`. The twin's camera is the real RealSense, not the simulation renderer.
+`Robot.camera(width=1280, height=720)` returns an `RGBDFrame` for either a standalone or shared MuJoCo scene, or for the Piper and FR3 `real` / `twin` backends. The frame contains RGB, depth, intrinsics, and camera-to-base extrinsics (`base_link` for Piper, `fr3_link0` for FR3); real-arm extrinsics require synchronized joint feedback. Connect with `Robot.connect(...)`, capture, then call `robot.disconnect()`. The twin's camera is the real RealSense, not the simulation renderer.
 
 For a RealSense capture without connecting the arm, use `robot_control --backend real camera --no-extrinsics` or:
 
@@ -63,4 +63,4 @@ from robot_control.sensors.service import CameraService
 frame = CameraService("real", include_extrinsics=False).capture()
 ```
 
-The camera-only frame has no extrinsics. CLI real-arm commands and real camera captures **with** extrinsics still require explicit `--backend real --robot piper`; FR3 real-arm control is not available.
+The camera-only frame has no extrinsics. CLI real-arm commands and real camera captures **with** extrinsics still require explicit `--backend real --robot piper` or `--backend real --robot franka_fr3`.

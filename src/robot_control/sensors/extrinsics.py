@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import math
+from functools import lru_cache
+from pathlib import Path
+import xml.etree.ElementTree as ET
 
 import numpy as np
 
@@ -57,6 +60,30 @@ def piper_link6_to_color_optical() -> np.ndarray:
     optical = np.eye(4)
     optical[:3, :3] = rpy_rotation(*PIPER_OPTICAL_RPY)
     return ORDINARY_LINK6_FROM_V100_LINK6 @ mount @ camera_link @ color @ optical
+
+
+@lru_cache(maxsize=1)
+def fr3_link7_to_color_optical() -> np.ndarray:
+    urdf = Path(__file__).resolve().parents[3] / "vendor/fr3_d435i/urdf/fr3_d435i_official.urdf"
+    joints = {joint.find("child").get("link"): joint
+              for joint in ET.parse(urdf).getroot().findall("joint")}
+    transforms = []
+    link = "d435i_color_optical_frame"
+    while link != "fr3_link7":
+        joint = joints[link]
+        if joint.get("type") != "fixed":
+            raise ValueError(f"FR3 camera joint {joint.get('name')} must be fixed")
+        origin = joint.find("origin")
+        transform = np.eye(4)
+        if origin is not None:
+            transform[:3, :3] = rpy_rotation(*(float(value) for value in origin.get("rpy", "0 0 0").split()))
+            transform[:3, 3] = [float(value) for value in origin.get("xyz", "0 0 0").split()]
+        transforms.append(transform)
+        link = joint.find("parent").get("link")
+    result = np.eye(4)
+    for transform in reversed(transforms):
+        result = result @ transform
+    return result
 
 
 def camera_extrinsics(transform: np.ndarray, reference_frame: str, camera_frame: str,
