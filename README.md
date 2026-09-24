@@ -65,7 +65,7 @@ robot_control --backend real --robot franka_fr3 state
 robot_control --backend real camera --no-extrinsics   # 仅采集本机 D435i，无需连接机械臂
 ```
 
-FR3 真机使用 `FRANKA_ROBOT_IP`（默认 `192.168.1.6`）直连；CLI 的 FR3 运动命令会立即发送，不再逐次要求输入确认。执行前须确认目标和现场安全；底层仍会检查机器人状态和目标参数。Python API 使用 `Robot.connect("mujoco", robot="franka_fr3")` 或 `Robot.connect("real", robot="franka_fr3")`。FR3 场景必须包含 `fr3_mount`，Piper 场景仍使用 `piper_mount`，参见 `docs/fr3.md`。
+FR3 真机使用 `FRANKA_ROBOT_IP`（默认 `192.168.1.6`）直连；关节和末端运动默认用 4 秒到位，可通过 `FRANKA_MOVE_DURATION_S` 或真机运动命令的 `--duration` 覆盖（twin 运行时须与其启动时长一致）。CLI 的 FR3 运动命令会立即发送，不再逐次要求输入确认。执行前须确认目标和现场安全；底层仍会检查机器人状态和目标参数。Python API 使用 `Robot.connect("mujoco", robot="franka_fr3")` 或 `Robot.connect("real", robot="franka_fr3")`。FR3 场景必须包含 `fr3_mount`，Piper 场景仍使用 `piper_mount`，参见 `docs/fr3.md`。
 
 ## Piper 真机 twin 镜像
 

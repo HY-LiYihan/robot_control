@@ -145,7 +145,7 @@ class FrankaDirectBackend:
                  gripper_speed_m_s: float = 0.05, rt_priority: int | None = None):
         self.robot_ip = robot_ip or os.environ.get("FRANKA_ROBOT_IP", "192.168.1.6")
         self.motion_duration_s = float(motion_duration_s if motion_duration_s is not None
-                                       else os.environ.get("FRANKA_MOVE_DURATION_S", "8.0"))
+                                       else os.environ.get("FRANKA_MOVE_DURATION_S", "4.0"))
         self.gripper_speed_m_s = float(gripper_speed_m_s)
         self.rt_priority = int(rt_priority if rt_priority is not None
                                else os.environ.get("FRANKA_RT_PRIORITY", "80"))

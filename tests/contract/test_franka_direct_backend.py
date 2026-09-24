@@ -103,6 +103,14 @@ def test_direct_selection_and_state_are_passive(bindings):
         instance.disconnect()
 
 
+def test_direct_default_motion_duration_and_overrides(monkeypatch):
+    monkeypatch.delenv("FRANKA_MOVE_DURATION_S", raising=False)
+    assert FrankaDirectBackend().motion_duration_s == 4.0
+    monkeypatch.setenv("FRANKA_MOVE_DURATION_S", "6.0")
+    assert FrankaDirectBackend().motion_duration_s == 6.0
+    assert FrankaDirectBackend(motion_duration_s=2.0).motion_duration_s == 2.0
+
+
 def test_direct_joint_and_cartesian_first_frame_and_final_command(bindings):
     backend = FrankaDirectBackend(motion_duration_s=0.02, rt_priority=0)
     backend.connect()

@@ -30,7 +30,7 @@ def test_fr3_twin_mirrors_feedback_and_routes_real_commands(monkeypatch):
 
     class FakeFranka:
         robot_ip = "192.168.1.6"
-        motion_duration_s = 8.0
+        motion_duration_s = 4.0
         gripper_speed_m_s = 0.05
         rt_priority = 80
 
@@ -93,7 +93,7 @@ def test_fr3_twin_mirrors_feedback_and_routes_real_commands(monkeypatch):
         with pytest.raises(ValueError, match="different FR3 IP"):
             Robot.connect("real", {"robot_ip": "192.168.1.9"}, robot="franka_fr3")
         with pytest.raises(ValueError, match="different motion_duration_s"):
-            Robot.connect("twin", {"motion_duration_s": 4}, robot="franka_fr3")
+            Robot.connect("twin", {"motion_duration_s": 8}, robot="franka_fr3")
         arm = Robot.connect("twin", robot="franka_fr3")
         try:
             assert isinstance(arm._backend, SceneClient)
